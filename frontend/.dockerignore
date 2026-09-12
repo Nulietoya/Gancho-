@@ -1,0 +1,14 @@
+# ETAPA 35: sem isso, `COPY . .` copiaria o `node_modules` do HOST
+# (instalado antes do `npm ci` da imagem) por cima do que o `npm ci`
+# acabou de instalar DENTRO do container — risco real de drift entre
+# lockfile e o que de fato fica instalado na imagem.
+node_modules/
+dist/
+e2e/
+test-results/
+playwright-report/
+coverage/
+.env
+.env.*
+!.env.example
+.git/

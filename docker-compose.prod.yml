@@ -1,0 +1,77 @@
+# ETAPA 35 — ambiente de produção. Roda com qualquer host que suporte
+# Docker Compose (VPS, ou um serviço gerenciado que aceite Compose) —
+# de propósito genérico quanto ao provedor, já que a escolha de
+# hospedagem continua em aberto (ver docs/decisions.md).
+#
+# Uso: ver docs/deploy.md pro passo a passo completo (variáveis de
+# ambiente, DNS, primeira subida). Resumo:
+#   cp backend/.env.production.example backend/.env.production
+#   # editar backend/.env.production com valores reais
+#   export DOMAIN=seu-dominio.com
+#   export VITE_API_BASE_URL=https://seu-dominio.com/api/v1
+#   docker compose -f docker-compose.prod.yml up --build -d
+#   docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+#
+# Diferenças de propósito em relação a docker-compose.yml (dev):
+# sem bind-mount do código (a imagem já tem tudo copiado — mudar
+# código exige rebuild, não hot-reload); Postgres não expõe a porta
+# 5432 pro host (só a rede interna do compose precisa alcançá-lo);
+# Caddy na frente cuidando de HTTPS automático (Let's Encrypt) e
+# roteando /api/* pro backend e o resto pro frontend.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
+    environment:
+      POSTGRES_USER: gancho
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no ambiente ou em backend/.env.production}
+      POSTGRES_DB: gancho
+    volumes:
+      - gancho_db_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gancho"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg2://gancho:${POSTGRES_PASSWORD}@db:5432/gancho
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?defina VITE_API_BASE_URL, ex. https://seu-dominio.com/api/v1}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?defina DOMAIN, ex. gancho.exemplo.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - gancho_caddy_data:/data
+      - gancho_caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+
+volumes:
+  gancho_db_data_prod:
+  gancho_caddy_data:
+  gancho_caddy_config:

@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+# ETAPA 35: cobre .env.production (e qualquer .env.<algo> futuro)
+# sem também ignorar os modelos .example que DEVEM ser commitados.
+.env.*
+!.env.example
+!.env.*.example
+node_modules/
+dist/
+.DS_Store
+*.log
+test-results/
+playwright-report/
+coverage/

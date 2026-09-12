@@ -1,0 +1,17 @@
+# ETAPA 35: sem isso, `COPY . .` no Dockerfile copiaria o `.env`
+# local (segredos de verdade, se existir) e o `.venv`/`__pycache__`
+# pra dentro da imagem — o `.env` é o mais sério: um arquivo com
+# segredo real ficaria gravado numa camada da imagem pra sempre,
+# mesmo que apagado depois (camadas de imagem são imutáveis), e
+# vazaria se a imagem fosse publicada num registry.
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+!.env.*.example
+.git/
+.pytest_cache/
+htmlcov/
+.coverage

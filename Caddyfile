@@ -1,0 +1,21 @@
+# ETAPA 35 — HTTPS automático (Let's Encrypt) sem configurar
+# certbot/nginx-TLS na mão: o Caddy pede e renova o certificado
+# sozinho a partir do domínio abaixo, desde que o DNS já aponte pra
+# este servidor nas portas 80/443. {$DOMAIN} vem da variável de
+# ambiente DOMAIN (ver docker-compose.prod.yml e docs/deploy.md).
+{$DOMAIN} {
+	# /health é usado pra confirmar que o backend está de pé (ver
+	# docs/deploy.md) — fica de fora do prefixo /api/v1 desde a
+	# ETAPA 3, então precisa de uma regra própria além de /api/*.
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

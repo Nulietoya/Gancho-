@@ -1,0 +1,90 @@
+name: CI
+
+# ETAPA 35: automatiza o que até aqui só rodava manualmente a cada
+# etapa fechada nesta sessão (pytest, npm run build/lint/test).
+# Decisão adiada desde a ETAPA 29 ("os testes existirem e rodarem
+# localmente é o escopo daquela etapa, automatizar é infraestrutura")
+# — fechada aqui.
+#
+# Um job por parte do sistema (backend/frontend), sem depender um do
+# outro: um push que só mexe no frontend não precisa esperar o
+# backend (e vice-versa), e uma falha num não mascara o resultado do
+# outro no painel de PRs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gancho
+          POSTGRES_PASSWORD: gancho
+          POSTGRES_DB: gancho
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gancho"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+psycopg2://gancho:gancho@localhost:5432/gancho
+        run: alembic upgrade head
+
+      - name: pytest
+        env:
+          DATABASE_URL: postgresql+psycopg2://gancho:gancho@localhost:5432/gancho
+          JWT_SECRET_KEY: chave-de-ci-nunca-usada-em-producao
+          ENVIRONMENT: test
+        run: pytest -q --cov=app --cov-report=term-missing
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+      # E2E (Playwright) fica FORA do CI de propósito por enquanto:
+      # precisa do backend+Postgres subindo junto (o `webServer` do
+      # playwright.config.ts já faz isso localmente), o que é viável
+      # aqui também, mas cada rodada de CI já leva o dobro do tempo
+      # rodando os dois serviços de novo — decisão de escopo: manter
+      # E2E como responsabilidade de rodar manualmente antes de um
+      # release (`npm run test:e2e`, documentado no README) até que o
+      # volume de PRs justifique o custo extra de CI. Revisitar se
+      # isso deixar de ser suficiente na prática.

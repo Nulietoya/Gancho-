@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gancho
+      POSTGRES_PASSWORD: gancho
+      POSTGRES_DB: gancho
+    ports:
+      - "5432:5432"
+    volumes:
+      - gancho_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gancho"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    # ETAPA 35: a imagem em backend/Dockerfile agora é a de produção
+    # por padrão (sem --reload) — este compose é o de DESENVOLVIMENTO,
+    # então sobrescreve o comando pra recarregar a cada mudança de
+    # código, como sempre funcionou. `docker-compose.prod.yml` é o
+    # usado em produção e não tem esse override.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://gancho:gancho@db:5432/gancho
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+
+volumes:
+  gancho_db_data:
