@@ -27,6 +27,11 @@ class Medication(IdMixin, TimestampMixin, Base):
     dosage_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     reminder_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Autodeclarado pela própria pessoa (nunca inferido) para quem tem
+    # dificuldade de perceber o tempo passar e some do primeiro aviso:
+    # com isso ligado, `scheduler_service.send_medication_reminders`
+    # repete o lembrete algumas vezes em vez de mandar um único aviso.
+    reminder_repeat_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     discontinued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     schedules: Mapped[list["MedicationSchedule"]] = relationship(

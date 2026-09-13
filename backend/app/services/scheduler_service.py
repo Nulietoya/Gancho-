@@ -15,12 +15,13 @@ APScheduler (fiação, não lógica) — mesma separação já usada entre
 """
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.time import utc_now as _now
-from app.models.enums import MedicationEventStatus
+from app.models.enums import MedicationEventStatus, NotificationPriority, NotificationType
 from app.models.medication import Medication, MedicationEvent, MedicationSchedule
+from app.models.notification import Notification
 from app.models.user import User
 from app.services import alert_service, deviation_service, indicator_service, notification_service
 
@@ -33,6 +34,17 @@ FORGOTTEN_DOSE_LOOKBACK_DAYS = 3
 # registro vira FORGOT_TO_CONFIRM — nunca no mesmo instante, pra dar
 # tempo real da pessoa confirmar antes.
 FORGOTTEN_DOSE_GRACE_HOURS = 3
+
+# A cada quantos minutos um lembrete de dose se repete quando
+# `Medication.reminder_repeat_enabled` está ligado (pensado pra
+# dificuldade de perceber o tempo passar — um único aviso some da
+# tela e a dose fica esquecida até o backfill do dia seguinte).
+MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES = 20
+# Quantos lembretes no máximo pra uma mesma dose, incluindo o
+# primeiro — sempre dentro da janela de graça (`FORGOTTEN_DOSE_GRACE_HOURS`),
+# nunca depois: passado isso é o backfill noturno que assume, com
+# `FORGOT_TO_CONFIRM`, não mais um lembrete.
+MEDICATION_REMINDER_MAX_REPEATS = 3
 
 
 def _active_users(db: Session) -> list[User]:
@@ -107,6 +119,125 @@ def fill_forgotten_medication_events(db: Session, user: User, when: datetime | N
             indicator_service.sync_medication_adherence_indicator(db, user.id, day)
         db.commit()
     return created
+
+
+def send_medication_reminders(db: Session, user: User, when: datetime | None = None) -> int:
+    """
+    Lembrete de dose em tempo real — complementa
+    `fill_forgotten_medication_events`, que só roda no ciclo noturno e
+    só registra o esquecimento depois de já ter acontecido. Sem isso a
+    pessoa só descobre que perdeu uma dose no dia seguinte.
+
+    Cada horário recebe no mínimo um lembrete (`NotificationType.REMINDER`,
+    prioridade MEDIUM — passa pelo anti-spam normal do item 37, nunca
+    HIGH) assim que `when` alcança `time_of_day`. Quando
+    `Medication.reminder_repeat_enabled` está ligado, o mesmo lembrete
+    se repete a cada `MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES` até
+    `MEDICATION_REMINDER_MAX_REPEATS` vezes — sempre dentro da janela
+    de graça (`FORGOTTEN_DOSE_GRACE_HOURS`), nunca depois: quem cuida
+    do que passou disso é o backfill noturno (`FORGOT_TO_CONFIRM`).
+    Para na hora: se já existe QUALQUER `MedicationEvent` pra este
+    horário (tomou, não tomou, indisponível) — mesma leitura de
+    "silêncio é informação real" já usada no backfill.
+
+    A contagem de quantos lembretes já saíram pra uma dose específica
+    é lida da própria tabela `Notification` (filtro pelo par
+    `medication_schedule_id`+`scheduled_for` no payload) — não existe
+    tabela nova só pra isso; `Notification` já é o registro de "o que
+    foi avisado e quando" que o produto precisa de qualquer forma.
+    """
+    when = when or _now()
+    sent = 0
+
+    schedules = db.scalars(
+        select(MedicationSchedule)
+        .join(Medication, MedicationSchedule.medication_id == Medication.id)
+        .where(
+            Medication.user_id == user.id,
+            Medication.discontinued_at.is_(None),
+            Medication.reminder_enabled.is_(True),
+        )
+    )
+    for schedule in schedules:
+        day = when.date()
+        if day < schedule.created_at.date() or not _weekday_matches(schedule, day):
+            continue
+
+        scheduled_for = datetime.combine(day, schedule.time_of_day, tzinfo=when.tzinfo)
+        if when < scheduled_for:
+            continue  # ainda não chegou a hora
+        if when >= scheduled_for + timedelta(hours=FORGOTTEN_DOSE_GRACE_HOURS):
+            continue  # já é trabalho do backfill noturno, não de lembrete
+
+        already_has_event = db.scalar(
+            select(MedicationEvent.id).where(
+                MedicationEvent.schedule_id == schedule.id,
+                MedicationEvent.scheduled_for == scheduled_for,
+            )
+        )
+        if already_has_event is not None:
+            continue
+
+        reminders_sent = db.scalar(
+            select(func.count(Notification.id)).where(
+                Notification.user_id == user.id,
+                Notification.type == NotificationType.REMINDER,
+                Notification.payload["medication_schedule_id"].astext == str(schedule.id),
+                Notification.payload["scheduled_for"].astext == scheduled_for.isoformat(),
+            )
+        ) or 0
+
+        medication = schedule.medication
+        max_reminders = MEDICATION_REMINDER_MAX_REPEATS if medication.reminder_repeat_enabled else 1
+        if reminders_sent >= max_reminders:
+            continue
+
+        next_due = scheduled_for + timedelta(minutes=MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES * reminders_sent)
+        if when < next_due:
+            continue
+
+        is_first = reminders_sent == 0
+        notification_service.create_notification(
+            db,
+            user.id,
+            NotificationType.REMINDER,
+            NotificationPriority.MEDIUM,
+            {
+                "medication_id": str(medication.id),
+                "medication_schedule_id": str(schedule.id),
+                "medication_name": medication.name,
+                "scheduled_for": scheduled_for.isoformat(),
+                "reminder_number": reminders_sent + 1,
+                "reason_summary": (
+                    f"Hora de {medication.name}"
+                    if is_first
+                    else f"Ainda não confirmou {medication.name}?"
+                ),
+            },
+            when=when,
+        )
+        sent += 1
+
+    return sent
+
+
+def send_due_medication_reminders(db: Session, when: datetime | None = None) -> dict:
+    """Mesmo padrão de isolamento por usuário do `run_nightly_cycle` — chamado a cada poucos minutos, não uma vez por dia."""
+    when = when or _now()
+    summary = {"users_processed": 0, "reminders_sent": 0, "failures": 0}
+    user_ids = [user.id for user in _active_users(db)]
+
+    for user_id in user_ids:
+        try:
+            user = db.get(User, user_id)
+            if user is None:
+                continue
+            summary["reminders_sent"] += send_medication_reminders(db, user, when)
+            summary["users_processed"] += 1
+        except Exception:
+            db.rollback()
+            summary["failures"] += 1
+    return summary
 
 
 def run_nightly_cycle(db: Session, when: datetime | None = None) -> dict:

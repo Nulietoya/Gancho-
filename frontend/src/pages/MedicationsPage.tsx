@@ -19,6 +19,7 @@ function CreateMedicationForm({ onCreated }: { onCreated: (medication: Medicatio
   const [dosageNote, setDosageNote] = useState("");
   const [notes, setNotes] = useState("");
   const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [reminderRepeatEnabled, setReminderRepeatEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,12 +33,14 @@ function CreateMedicationForm({ onCreated }: { onCreated: (medication: Medicatio
         dosage_note: dosageNote.trim() || null,
         notes: notes.trim() || null,
         reminder_enabled: reminderEnabled,
+        reminder_repeat_enabled: reminderRepeatEnabled,
       });
       onCreated(medication);
       setName("");
       setDosageNote("");
       setNotes("");
       setReminderEnabled(true);
+      setReminderRepeatEnabled(false);
     } catch (err) {
       setError(describeError(err, "não foi possível adicionar o medicamento"));
     } finally {
@@ -71,6 +74,16 @@ function CreateMedicationForm({ onCreated }: { onCreated: (medication: Medicatio
           <input type="checkbox" checked={reminderEnabled} onChange={(e) => setReminderEnabled(e.target.checked)} />
           Me lembrar nos horários cadastrados
         </label>
+        {reminderEnabled && (
+          <label className="permission-checkbox">
+            <input
+              type="checkbox"
+              checked={reminderRepeatEnabled}
+              onChange={(e) => setReminderRepeatEnabled(e.target.checked)}
+            />
+            Repetir o lembrete até eu confirmar (eu costumo perder a noção do tempo e esquecer)
+          </label>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}

@@ -18,6 +18,7 @@ def test_create_and_list_medication(client):
     headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
     med = _create_medication(client, headers)
     assert med["discontinued_at"] is None
+    assert med["reminder_repeat_enabled"] is False  # opt-in, nunca ligado por padrão
 
     listing = client.get("/api/v1/medications", headers=headers).json()
     assert len(listing) == 1
@@ -47,6 +48,16 @@ def test_patch_updates_descriptive_fields(client):
     assert response.status_code == 200
     assert response.json()["reminder_enabled"] is False
     assert response.json()["name"] == "sertralina"
+
+
+def test_patch_toggles_reminder_repeat(client):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med = _create_medication(client, headers)
+    response = client.patch(
+        f"/api/v1/medications/{med['id']}", json={"reminder_repeat_enabled": True}, headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["reminder_repeat_enabled"] is True
 
 
 def test_create_schedule_for_medication(client):

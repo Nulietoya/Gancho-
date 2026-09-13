@@ -3,7 +3,9 @@ ETAPA 22 — ciclo automático. Cobre o preenchimento de doses de
 medicação esquecidas (grace period, não-duplicação, respeito a dias
 da semana, e nunca inventar histórico de antes de o horário existir)
 e o ciclo noturno de desvio/alerta rodando por trás de `run_nightly_cycle`
-sem precisar dos endpoints manuais.
+sem precisar dos endpoints manuais. Também cobre o lembrete de dose em
+tempo real (`send_medication_reminders`), incluindo o modo repetido
+pensado pra dificuldade de perceber o tempo passar.
 """
 import datetime
 
@@ -18,9 +20,17 @@ OWNER_EMAIL = "sched-dono@example.com"
 OWNER_PASSWORD = "senhaForte123"
 
 
-def _create_medication_and_schedule(client, headers, time_of_day="08:00:00", weekdays=None):
+def _create_medication_and_schedule(
+    client, headers, time_of_day="08:00:00", weekdays=None, reminder_enabled=True, reminder_repeat_enabled=False
+):
     med = client.post(
-        "/api/v1/medications", json={"name": "sertralina", "reminder_enabled": True}, headers=headers
+        "/api/v1/medications",
+        json={
+            "name": "sertralina",
+            "reminder_enabled": reminder_enabled,
+            "reminder_repeat_enabled": reminder_repeat_enabled,
+        },
+        headers=headers,
     ).json()
     payload = {"time_of_day": time_of_day}
     if weekdays is not None:
@@ -177,3 +187,133 @@ def test_deliver_due_notifications_wrapper_delegates(client, db_session):
     later = deferred.scheduled_for + datetime.timedelta(minutes=1)
     count = scheduler_service.deliver_due_notifications(db_session, when=later)
     assert count == 1
+
+
+def test_medication_reminder_not_sent_before_scheduled_time(client, db_session):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    _create_medication_and_schedule(client, headers, time_of_day="08:00:00")
+
+    when = datetime.datetime.now(datetime.timezone.utc).replace(hour=7, minute=59, second=0, microsecond=0)
+    sent = scheduler_service.send_medication_reminders(db_session, _owner(db_session), when)
+    assert sent == 0
+
+
+def test_medication_reminder_sent_when_time_arrives(client, db_session):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med, schedule = _create_medication_and_schedule(client, headers, time_of_day="08:00:00")
+
+    when = datetime.datetime.now(datetime.timezone.utc).replace(hour=8, minute=0, second=0, microsecond=0)
+    sent = scheduler_service.send_medication_reminders(db_session, _owner(db_session), when)
+    assert sent == 1
+
+    notifications = notification_service.list_notifications(db_session, _owner(db_session))
+    assert len(notifications) == 1
+    assert notifications[0].type == NotificationType.REMINDER
+    assert notifications[0].priority == NotificationPriority.MEDIUM
+    assert notifications[0].payload["medication_schedule_id"] == schedule["id"]
+    assert notifications[0].payload["reminder_number"] == 1
+
+
+def test_medication_reminder_never_sent_when_disabled_on_medication(client, db_session):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    _create_medication_and_schedule(client, headers, time_of_day="08:00:00", reminder_enabled=False)
+
+    when = datetime.datetime.now(datetime.timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+    sent = scheduler_service.send_medication_reminders(db_session, _owner(db_session), when)
+    assert sent == 0
+
+
+def test_medication_reminder_without_repeat_mode_sends_only_once(client, db_session):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    _create_medication_and_schedule(client, headers, time_of_day="08:00:00", reminder_repeat_enabled=False)
+    owner = _owner(db_session)
+
+    first = datetime.datetime.now(datetime.timezone.utc).replace(hour=8, minute=0, second=0, microsecond=0)
+    assert scheduler_service.send_medication_reminders(db_session, owner, first) == 1
+
+    later = first + datetime.timedelta(minutes=30)
+    assert scheduler_service.send_medication_reminders(db_session, owner, later) == 0
+
+    notifications = notification_service.list_notifications(db_session, owner)
+    assert len(notifications) == 1
+
+
+def test_medication_reminder_repeat_mode_escalates_until_max(client, db_session):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    _create_medication_and_schedule(client, headers, time_of_day="08:00:00", reminder_repeat_enabled=True)
+    owner = _owner(db_session)
+    scheduled = datetime.datetime.now(datetime.timezone.utc).replace(hour=8, minute=0, second=0, microsecond=0)
+
+    assert scheduler_service.send_medication_reminders(db_session, owner, scheduled) == 1  # 1º lembrete
+
+    just_after = scheduled + datetime.timedelta(minutes=1)
+    assert scheduler_service.send_medication_reminders(db_session, owner, just_after) == 0  # ainda dentro do intervalo
+
+    second_due = scheduled + datetime.timedelta(
+        minutes=scheduler_service.MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES
+    )
+    assert scheduler_service.send_medication_reminders(db_session, owner, second_due) == 1  # 2º lembrete
+
+    third_due = scheduled + datetime.timedelta(
+        minutes=2 * scheduler_service.MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES
+    )
+    assert scheduler_service.send_medication_reminders(db_session, owner, third_due) == 1  # 3º lembrete (o máximo)
+
+    fourth_due = scheduled + datetime.timedelta(
+        minutes=3 * scheduler_service.MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES
+    )
+    assert scheduler_service.send_medication_reminders(db_session, owner, fourth_due) == 0  # já bateu o teto
+
+    notifications = notification_service.list_notifications(db_session, owner)
+    assert len(notifications) == scheduler_service.MEDICATION_REMINDER_MAX_REPEATS
+    assert [n.payload["reminder_number"] for n in notifications] == [3, 2, 1]  # mais recente primeiro
+
+
+def test_medication_reminder_stops_once_a_dose_event_exists(client, db_session):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med, schedule = _create_medication_and_schedule(
+        client, headers, time_of_day="08:00:00", reminder_repeat_enabled=True
+    )
+    owner = _owner(db_session)
+    scheduled = datetime.datetime.now(datetime.timezone.utc).replace(hour=8, minute=0, second=0, microsecond=0)
+
+    assert scheduler_service.send_medication_reminders(db_session, owner, scheduled) == 1
+
+    client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{schedule['id']}/events",
+        json={"scheduled_for": scheduled.isoformat(), "status": "taken"},
+        headers=headers,
+    )
+
+    later = scheduled + datetime.timedelta(minutes=scheduler_service.MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES)
+    assert scheduler_service.send_medication_reminders(db_session, owner, later) == 0
+
+    notifications = notification_service.list_notifications(db_session, owner)
+    assert len(notifications) == 1  # só o lembrete de antes de confirmar, nada depois
+
+
+def test_medication_reminder_never_sent_past_the_forgotten_dose_grace_window(client, db_session):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    _create_medication_and_schedule(client, headers, time_of_day="08:00:00", reminder_repeat_enabled=True)
+    owner = _owner(db_session)
+
+    past_grace = datetime.datetime.now(datetime.timezone.utc).replace(
+        hour=8, minute=0, second=0, microsecond=0
+    ) + datetime.timedelta(hours=scheduler_service.FORGOTTEN_DOSE_GRACE_HOURS)
+    sent = scheduler_service.send_medication_reminders(db_session, owner, past_grace)
+    assert sent == 0  # daqui pra frente é trabalho do backfill noturno (FORGOT_TO_CONFIRM), não de lembrete
+
+
+def test_send_due_medication_reminders_processes_all_active_users(client, db_session, monkeypatch):
+    headers_a = _register_and_login(client, "sched-med-a@example.com", OWNER_PASSWORD)
+    headers_b = _register_and_login(client, "sched-med-b@example.com", OWNER_PASSWORD)
+    _create_medication_and_schedule(client, headers_a, time_of_day="08:00:00")
+    _create_medication_and_schedule(client, headers_b, time_of_day="08:00:00")
+
+    user_a = _owner(db_session, "sched-med-a@example.com")
+    user_b = _owner(db_session, "sched-med-b@example.com")
+    monkeypatch.setattr(scheduler_service, "_active_users", lambda db: [user_a, user_b])
+
+    when = datetime.datetime.now(datetime.timezone.utc).replace(hour=8, minute=0, second=0, microsecond=0)
+    summary = scheduler_service.send_due_medication_reminders(db_session, when)
+    assert summary == {"users_processed": 2, "reminders_sent": 2, "failures": 0}

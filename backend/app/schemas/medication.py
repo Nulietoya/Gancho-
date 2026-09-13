@@ -21,6 +21,7 @@ class MedicationCreate(BaseModel):
     dosage_note: str | None = Field(default=None, max_length=500)
     notes: str | None = None
     reminder_enabled: bool = True
+    reminder_repeat_enabled: bool = False
 
 
 class MedicationUpdate(BaseModel):
@@ -28,6 +29,7 @@ class MedicationUpdate(BaseModel):
     dosage_note: str | None = Field(default=None, max_length=500)
     notes: str | None = None
     reminder_enabled: bool | None = None
+    reminder_repeat_enabled: bool | None = None
 
 
 class MedicationPublic(BaseModel):
@@ -36,6 +38,7 @@ class MedicationPublic(BaseModel):
     dosage_note: str | None
     notes: str | None
     reminder_enabled: bool
+    reminder_repeat_enabled: bool
     discontinued_at: datetime | None
     created_at: datetime
     updated_at: datetime

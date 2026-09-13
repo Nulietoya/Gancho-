@@ -40,6 +40,18 @@ def _run_notification_delivery() -> None:
         db.close()
 
 
+def _run_medication_reminders() -> None:
+    db = SessionLocal()
+    try:
+        summary = scheduler_service.send_due_medication_reminders(db)
+        if summary["reminders_sent"]:
+            logger.info("lembretes de medicação enviados: %s", summary)
+    except Exception:
+        logger.exception("falha ao enviar lembretes de medicação")
+    finally:
+        db.close()
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
@@ -56,13 +68,24 @@ def start_scheduler() -> BackgroundScheduler:
     scheduler.add_job(
         _run_notification_delivery, "interval", minutes=15, id="notification_delivery", replace_existing=True
     )
+    # A cada 5 minutos: lembrete de dose de medicação em tempo real
+    # (item novo, pensado pra dificuldade de perceber o tempo passar)
+    # — intervalo mais curto que o de entrega represada de propósito,
+    # já que aqui o próprio "chegou a hora" é o gatilho, não um
+    # `scheduled_for` já calculado de antemão.
+    scheduler.add_job(
+        _run_medication_reminders, "interval", minutes=5, id="medication_reminders", replace_existing=True
+    )
     scheduler.start()
     _scheduler = scheduler
     # WARNING, não INFO: nível padrão de log filtra INFO (mesmo motivo
     # documentado em app/core/email.py) — isto é o único jeito de
     # confirmar visualmente, no log do processo, que o scheduler
     # realmente subiu.
-    logger.warning("scheduler iniciado (ciclo noturno 03:00 UTC, entrega de notificações a cada 15min)")
+    logger.warning(
+        "scheduler iniciado (ciclo noturno 03:00 UTC, entrega de notificações a cada 15min, "
+        "lembretes de medicação a cada 5min)"
+    )
     return scheduler
 
 

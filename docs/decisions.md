@@ -6,6 +6,85 @@ nova vai no topo.
 
 ---
 
+## 2026-09-13 — pós-MVP: lembrete de medicação repetido
+
+### Escopo
+
+Primeira mudança depois da ETAPA 36 ("as 36 etapas do roteiro estão
+concluídas"). Pedido explícito do usuário: um lembrete de dose que se
+adapte a quem tem dificuldade de perceber o tempo passar — um único
+aviso que some da tela é fácil de esquecer que existiu. Não é o
+mesmo problema que o backfill noturno já resolve (`FORGOT_TO_CONFIRM`,
+ETAPA 22): aquele só registra o esquecimento depois de consumado, no
+dia seguinte; isto avisa em tempo real, enquanto ainda dá pra agir.
+
+### O que foi construído
+
+- `Medication.reminder_repeat_enabled` (novo campo, opt-in,
+  autodeclarado pela própria pessoa — nunca inferido pelo sistema,
+  mesma régua do item 13 aplicada ao resto do módulo de medicação).
+  Migration incremental de verdade (`a3f1c9e7b214`), não a edição
+  direta da migration-base usada durante o desenvolvimento do MVP
+  (ver entrada da ETAPA 4/18 abaixo sobre isso) — o projeto já é
+  considerado "pronto", então uma mudança de schema agora se
+  comporta como qualquer mudança pós-lançamento: `ADD COLUMN` com
+  `server_default` pra não quebrar linha já existente, default
+  removido em seguida pra bater exatamente com o model. Autogenerate
+  confirmado com diff vazio depois de aplicar.
+- `scheduler_service.send_medication_reminders`: pra cada horário com
+  `Medication.reminder_enabled`, manda um lembrete (`NotificationType.REMINDER`,
+  prioridade MEDIUM — passa pelo anti-spam normal do item 37, nunca
+  HIGH) assim que a hora chega. Quando `reminder_repeat_enabled` está
+  ligado, repete a cada `MEDICATION_REMINDER_REPEAT_INTERVAL_MINUTES`
+  (20min) até `MEDICATION_REMINDER_MAX_REPEATS` (3) vezes. Sempre
+  dentro da janela de graça que já existia (`FORGOTTEN_DOSE_GRACE_HOURS`,
+  3h) — depois disso quem assume é o backfill noturno, nunca os dois
+  ao mesmo tempo. Para na hora se já existe qualquer `MedicationEvent`
+  pra aquele horário (tomou, não tomou, indisponível — mesma leitura
+  de "silêncio é informação real" do backfill).
+- Contagem de quantos lembretes já saíram pra uma dose específica é
+  lida da própria tabela `Notification` (filtro pelo par
+  `medication_schedule_id`+`scheduled_for` no payload JSONB) — decisão
+  deliberada de não criar tabela nova só pra isso; `Notification` já é
+  o registro de "o que foi avisado e quando" que o produto precisa de
+  qualquer forma.
+- Novo job do `BackgroundScheduler` a cada 5 minutos
+  (`app/core/scheduler.py`), separado do job de entrega represada (15
+  minutos, item 37) — aqui "chegou a hora" é o próprio gatilho, não um
+  `scheduled_for` já calculado de antemão, então precisa de mais
+  granularidade.
+- Frontend: novo checkbox em "Adicionar medicamento" (só aparece
+  quando o lembrete básico está ligado), tipos TS e chamada da API
+  atualizados.
+
+### Decisão de escopo registrada
+
+Intervalo (20min) e teto (3 repetições) são constantes de módulo, não
+configuráveis por usuário ainda — mesmo raciocínio já usado noutros
+lugares do projeto (item 65, não complicar sem necessidade): expor
+como preferência é uma migration pequena quando/se isso importar de
+verdade, não algo a adiantar sem pedido concreto.
+
+### Verificação
+
+- 9 testes novos (`tests/test_scheduler_service.py`): não manda antes
+  da hora; manda o primeiro lembrete na hora certa; sem o modo
+  repetido manda só uma vez; com o modo repetido escala até o teto e
+  para; para na hora se a dose já foi confirmada; nunca manda depois
+  da janela de graça (aí é trabalho do backfill); o wrapper por
+  usuário processa todos os usuários ativos isoladamente. Mais 2
+  testes novos (`tests/test_medications.py`) cobrindo o campo novo no
+  CRUD.
+- `alembic upgrade head` aplicado contra Postgres real a partir do
+  zero (todas as migrations, incluindo a nova) e `alembic revision
+  --autogenerate` confirmado com diff vazio depois.
+- `pytest -q` → **234 passed** (223 anteriores + 11 novos deste módulo).
+- Frontend: `tsc -b` sem erro, `vitest run` → 25 passed (suíte
+  existente, sem regressão), lint sem apontamento nos arquivos
+  tocados.
+
+---
+
 ## 2026-09-12 — ETAPA 36: documentação final
 
 ### Escopo desta etapa

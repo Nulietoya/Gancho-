@@ -81,6 +81,7 @@ export interface MedicationPublic {
   dosage_note: string | null;
   notes: string | null;
   reminder_enabled: boolean;
+  reminder_repeat_enabled: boolean;
   discontinued_at: string | null;
   created_at: string;
   updated_at: string;
@@ -91,6 +92,7 @@ export interface MedicationCreate {
   dosage_note?: string | null;
   notes?: string | null;
   reminder_enabled?: boolean;
+  reminder_repeat_enabled?: boolean;
 }
 
 export interface SchedulePublic {
