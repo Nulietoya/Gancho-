@@ -38,11 +38,13 @@ class Settings(BaseSettings):
     # CORS (origens do frontend autorizadas)
     cors_origins: list[str] = ["http://localhost:5173"]
 
-    # E-mail (ETAPA 22). Sem `smtp_host` configurado, o envio cai no
-    # backend de log (ver app/core/email.py) — nunca falha por falta
-    # de provedor, só não entrega de verdade; configurar estas
-    # variáveis em produção liga o envio real sem mudar código nenhum
-    # de quem chama `send_email`.
+    # E-mail (ETAPA 22, revisado na ETAPA 35). Sem nenhum provedor
+    # configurado, o envio cai no backend de log (ver
+    # app/core/email.py) — nunca falha por falta de provedor, só não
+    # entrega de verdade; configurar RESEND_API_KEY (recomendado — ver
+    # docs/deploy.md) ou as variáveis SMTP_* em produção liga o envio
+    # real sem mudar código nenhum de quem chama `send_email`.
+    resend_api_key: str | None = None
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
