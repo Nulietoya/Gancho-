@@ -65,7 +65,14 @@ def send_email(to_email: str, subject: str, body: str) -> None:
 
 
 def _send_via_resend(settings: Settings, to_email: str, subject: str, body: str) -> None:
-    from_email = settings.smtp_from_email or "Gancho <onboarding@resend.dev>"
+    # NUNCA usar `settings.smtp_from_email` aqui: é um endereço qualquer
+    # (ex.: Gmail do usuário), e o Resend rejeita com 403 qualquer
+    # remetente que não seja o domínio de teste deles ou um domínio
+    # próprio verificado — enviar "de" um Gmail seria falsificação de
+    # remetente, bloqueada por design. `resend_from_email` existe
+    # justamente pra, no futuro, apontar pra um domínio verificado
+    # (resend.com/domains) sem precisar mudar código nenhum.
+    from_email = settings.resend_from_email or "Gancho <onboarding@resend.dev>"
     try:
         response = httpx.post(
             _RESEND_API_URL,

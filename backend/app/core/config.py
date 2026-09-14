@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     # docs/deploy.md) ou as variáveis SMTP_* em produção liga o envio
     # real sem mudar código nenhum de quem chama `send_email`.
     resend_api_key: str | None = None
+    # Sem isso, usa o domínio de teste do Resend (onboarding@resend.dev)
+    # — funciona, mas o Resend só entrega e-mail de teste pro próprio
+    # endereço da conta cadastrada nele; pra entregar pra qualquer
+    # destinatário de verdade, verificar um domínio em
+    # resend.com/domains e apontar esta variável pra um remetente
+    # nesse domínio.
+    resend_from_email: str | None = None
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
