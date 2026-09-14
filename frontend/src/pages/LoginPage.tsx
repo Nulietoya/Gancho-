@@ -59,6 +59,9 @@ export function LoginPage() {
           {submitting ? "Entrando…" : "Entrar"}
         </button>
         <p className="auth-switch">
+          <Link to="/esqueci-senha">Esqueci minha senha</Link>
+        </p>
+        <p className="auth-switch">
           Ainda não tem conta? <Link to="/criar-conta">Criar conta</Link>
         </p>
       </form>

@@ -8,10 +8,12 @@ import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { AuditLogPage } from "./pages/AuditLogPage";
 import { CheckinPage } from "./pages/CheckinPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MedicationsPage } from "./pages/MedicationsPage";
 import { PersonalPlanPage } from "./pages/PersonalPlanPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { RoutinePage } from "./pages/RoutinePage";
 import { TasksPage } from "./pages/TasksPage";
 import { TrustedDashboardPage } from "./pages/TrustedDashboardPage";
@@ -23,6 +25,8 @@ export function App() {
     <Routes>
       <Route path="/entrar" element={<LoginPage />} />
       <Route path="/criar-conta" element={<RegisterPage />} />
+      <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route path="/" element={<DashboardPage />} />
