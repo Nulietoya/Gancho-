@@ -100,7 +100,7 @@ function PostponeForm({
   onSubmit,
   onCancel,
 }: {
-  onSubmit: (reason: TaskFailureReasonType, customText: string) => Promise<void>;
+  onSubmit: (reason: TaskFailureReasonType, customText: string) => Promise<boolean>;
   onCancel: () => void;
 }) {
   const [reason, setReason] = useState<TaskFailureReasonType>(TASK_FAILURE_REASON_ORDER[0]);
@@ -113,7 +113,8 @@ function PostponeForm({
     setError(null);
     setSubmitting(true);
     try {
-      await onSubmit(reason, customText.trim());
+      const saved = await onSubmit(reason, customText.trim());
+      if (!saved) setSubmitting(false);
     } catch (err) {
       setError(describeError(err, "não foi possível adiar"));
       setSubmitting(false);
@@ -167,13 +168,15 @@ export function TaskCard({
   const [showPostpone, setShowPostpone] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
-  async function run(action: () => Promise<TaskPublic>) {
+  async function run(action: () => Promise<TaskPublic>): Promise<boolean> {
     setActing(true);
     setError(null);
     try {
       onChanged(await action());
+      return true;
     } catch (err) {
       setError(describeError(err, "não foi possível atualizar a tarefa"));
+      return false;
     } finally {
       setActing(false);
     }
@@ -244,8 +247,9 @@ export function TaskCard({
         <PostponeForm
           onCancel={() => setShowPostpone(false)}
           onSubmit={async (reason, customText) => {
-            await run(() => postponeTask(task.id, { reason, custom_text: customText || null }));
-            setShowPostpone(false);
+            const saved = await run(() => postponeTask(task.id, { reason, custom_text: customText || null }));
+            if (saved) setShowPostpone(false);
+            return saved;
           }}
         />
       )}
@@ -335,3 +339,4 @@ export function TasksPage() {
     </div>
   );
 }
+
