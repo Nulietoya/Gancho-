@@ -22,10 +22,10 @@ USER gancho
 
 EXPOSE 8000
 
-# WEB_CONCURRENCY controla o número de workers do uvicorn — padrão
-# conservador de 2, ajustável por variável de ambiente sem rebuildar
-# a imagem. Multiplique pelo número de CPUs disponíveis no servidor
-# escolhido; ver docs/deploy.md.
+# Um worker por padrão: o lifespan da API inicia o APScheduler dentro
+# do processo. Múltiplos workers executariam os mesmos jobs em paralelo.
+# Para escalar a API, separe primeiro o scheduler em um processo único
+# e use armazenamento compartilhado para o rate limit.
 #
 # CMD em forma de lista com `sh -c 'exec ...'` (não a forma "shell"
 # simples `CMD uvicorn ...`) de propósito: o linter do próprio
@@ -35,5 +35,5 @@ EXPOSE 8000
 # timeout inteiro e mataria à força em vez de encerrar graciosamente
 # as conexões em andamento. O `exec` troca o processo do shell pelo
 # do uvicorn (mesmo PID), que passa a receber o sinal direto.
-ENV WEB_CONCURRENCY=2
+ENV WEB_CONCURRENCY=1
 CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY}"]
