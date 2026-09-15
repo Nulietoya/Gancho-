@@ -19,6 +19,10 @@ atrapalharia — a própria suíte de testes faz muito mais que N
 requisições por minuto na mesma rota, de propósito, pra testar outros
 comportamentos.
 """
+import ipaddress
+import socket
+
+from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -26,7 +30,26 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+
+def get_client_ip(request: Request) -> str:
+    """Use Caddy's client IP only when the immediate peer is Caddy itself."""
+    peer = get_remote_address(request)
+    if settings.environment != "production":
+        return peer
+    try:
+        caddy_ip = socket.gethostbyname("caddy")
+    except OSError:
+        return peer
+    if peer != caddy_ip:
+        return peer
+    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+    try:
+        return str(ipaddress.ip_address(forwarded))
+    except ValueError:
+        return peer
+
+
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=get_client_ip,
     enabled=settings.environment == "production",
 )
