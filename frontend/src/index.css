@@ -2,23 +2,29 @@
   Tom "Companheiro calmo" (decidido pelo usuário como padrão de
   interface): paleta de baixo estímulo, espaçamento generoso, alvos de
   toque grandes — pensado pra alguém em dia ruim, não só em dia bom.
+  Continua sendo o tema PADRÃO — nada muda pra quem não escolher outro.
 
-  Decisão de escopo registrada (ETAPA 27): só o tema claro por
-  enquanto. O modo "Quase vazio" (UI ainda mais mínima, mencionado
-  como opção na primeira tela) e um tema escuro ficam pra uma leva
-  seguinte de frontend — não fazem parte desta primeira conexão
-  ponta a ponta.
+  Tema escuro (2026-09): a escolha de tema — mencionada desde o início
+  do projeto e adiada na ETAPA 27 — foi implementada como uma segunda
+  opção que a pessoa liga em Configurações (`/configuracoes`), nunca
+  como substituição do padrão. Os valores de cor vivem só aqui, nas
+  mesmas variáveis (`--color-*`) que todo o resto do arquivo já usa —
+  então o tema escuro passa a valer em cada componente sem precisar
+  reescrever regra por regra. O modo "Quase vazio" (UI ainda mais
+  mínima) continua fora do escopo.
 */
 
 :root {
   --color-bg: #f7f5f2;
   --color-surface: #ffffff;
+  --color-surface-muted: #f1efe9;
   --color-border: #e4ded4;
   --color-text: #2f2b26;
   --color-text-muted: #6b6459;
   --color-primary: #3f6f6a;
   --color-primary-hover: #345c58;
   --color-primary-contrast: #ffffff;
+  --color-focus-ring: rgba(63, 111, 106, 0.25);
 
   --color-green: #4f8a5b;
   --color-green-bg: #eaf3ea;
@@ -32,6 +38,31 @@
   --spacing-2: 16px;
   --spacing-3: 24px;
   --spacing-4: 32px;
+}
+
+/*
+  Tema escuro — mesma escala de variáveis, valores diferentes.
+  Aplicado via `document.documentElement.dataset.theme = "dark"`
+  (ver `src/store/themeStore.ts`), persistido em localStorage.
+*/
+:root[data-theme="dark"] {
+  --color-bg: #0d0f14;
+  --color-surface: #14171f;
+  --color-surface-muted: #1b1f2a;
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-text: #eef0f4;
+  --color-text-muted: #98a0b3;
+  --color-primary: #5b9490;
+  --color-primary-hover: #6fa9a4;
+  --color-primary-contrast: #0d0f14;
+  --color-focus-ring: rgba(91, 148, 144, 0.35);
+
+  --color-green: #5fb178;
+  --color-green-bg: rgba(95, 177, 120, 0.16);
+  --color-yellow: #d9a54a;
+  --color-yellow-bg: rgba(217, 165, 74, 0.16);
+  --color-red: #d97a68;
+  --color-red-bg: rgba(217, 122, 104, 0.16);
 }
 
 * {
@@ -276,6 +307,7 @@ button:focus-visible,
 .app-more summary:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
 }
 
 /* --- botões -------------------------------------------------------------- */
@@ -321,7 +353,12 @@ button:focus-visible,
 }
 
 .button--danger:hover {
-  background: #94402f;
+  filter: brightness(0.85);
+}
+
+.theme-switch {
+  display: flex;
+  gap: var(--spacing-1);
 }
 
 /* --- cartões / conteúdo --------------------------------------------------- */
@@ -505,7 +542,7 @@ button:focus-visible,
   display: inline-block;
   margin-top: var(--spacing-1);
   padding: 2px 6px;
-  background: var(--color-surface-muted, #f1f1f1);
+  background: var(--color-surface-muted);
   border-radius: 4px;
   word-break: break-all;
   font-size: 0.85em;

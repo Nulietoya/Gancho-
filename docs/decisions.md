@@ -2706,3 +2706,68 @@ funciona ponta a ponta pra quem usa de fora.
   pro Resend (confirmado sem erro no log); convite grava o token
   corretamente e a resposta da API o inclui — sem regressão no
   isolamento de quem cada relacionamento pertence.
+
+## 2026-09-15 — Tema escuro (Configurações → Aparência)
+
+### O que motivou
+
+O usuário trouxe uma especificação de CSS pronta pedindo um visual
+"mais profissional": paleta escura estilo slate/zinc, tipografia com
+tracking negativo em títulos, anéis de foco visíveis, transições de
+150ms.
+
+### Contradição encontrada e como foi resolvida
+
+A especificação, aplicada como veio (seletores genéricos com
+`!important` sobrescrevendo `.card`, `button`, `input` global), teria
+substituído o único tema existente — o "Companheiro calmo" claro,
+decisão de produto registrada desde o início do projeto
+(`docs/decisions.md`, entrada de nomenclatura "Gancho" vs. documento
+clínico) e reafirmada explicitamente no topo de `index.css` desde a
+ETAPA 27. Trocar o padrão em silêncio teria ido contra essa decisão
+sem avisar.
+
+Ao mesmo tempo, o próprio `index.css` já linkava um tema escuro como
+opção futura ("Decisão de escopo... um tema escuro fica pra uma leva
+seguinte de frontend") — e o relatório da outra sessão (ver entrada
+anterior) tinha acabado de apontar "escolha de tema" como lacuna real
+do produto. A especificação do usuário se encaixa exatamente nessa
+lacuna já mapeada.
+
+**Resolução**: implementado como uma SEGUNDA opção de tema, nunca como
+substituição — claro continua sendo o padrão pra quem não escolher
+nada. Cores adaptadas dos valores enviados, mas usando o mesmo tom
+"calmo" (teal acinzentado) em vez do azul neon do exemplo, pra manter
+a identidade visual já estabelecida do produto em vez de trocar de
+personalidade visual.
+
+### Como foi implementado
+
+- `frontend/src/index.css`: mesmas variáveis `--color-*` já usadas em
+  todo o arquivo, redefinidas sob `:root[data-theme="dark"]` — nenhum
+  componente precisou de CSS novo, porque o arquivo já era
+  inteiramente orientado a variáveis (só 2 cores hardcoded existiam
+  fora do `:root`, ambas corrigidas pra usar variável também).
+- `frontend/src/store/themeStore.ts` (zustand, mesmo padrão de
+  `authStore.ts`): guarda o tema em `localStorage`
+  (`gancho_theme`), aplica via `document.documentElement.dataset.theme`.
+- `frontend/index.html`: script inline que lê o tema salvo antes do
+  React montar, pra não piscar o tema claro em quem escolheu escuro.
+- `AccountSettingsPage.tsx` (`/configuracoes`): nova seção
+  "Aparência" com os dois botões (claro/escuro).
+- Modo "Quase vazio" (UI mínima) continua fora do escopo, como sempre
+  esteve.
+
+### Verificação
+
+- 31 testes de frontend passam (28 anteriores + 3 novos de
+  `themeStore`).
+- `tsc -b && vite build` limpo, sem erro novo de lint (`oxlint`).
+- Verificado visualmente (screenshot real via Playwright, não só
+  teste automatizado): tema claro inalterado; tema escuro legível,
+  contraste ok, sem flash do tema errado ao carregar.
+- Ainda não verificado: telas autenticadas (painel, rede de
+  confiança, etc.) no tema escuro — só as telas públicas
+  (login/esqueci-senha) foram inspecionadas visualmente, porque exigem
+  sessão. A cobertura de variáveis é a mesma em todo o arquivo, então
+  o risco é baixo, mas não é a mesma coisa que ter olhado.

@@ -3,6 +3,42 @@ import { useNavigate } from "react-router-dom";
 import { changePassword, deactivateAccount, exportAndDownloadAccountData } from "../api/account";
 import { describeError } from "../api/client";
 import { useAuthStore } from "../store/authStore";
+import { useThemeStore } from "../store/themeStore";
+
+function AppearanceSection() {
+  const theme = useThemeStore((s) => s.theme);
+  const setTheme = useThemeStore((s) => s.setTheme);
+
+  return (
+    <section className="card">
+      <h2>Aparência</h2>
+      <p className="checkin-hint">
+        O padrão é o visual claro e calmo pensado pro app desde o início. O escuro é uma opção pra quem prefere —
+        muda só a cor, nada na forma como o app funciona.
+      </p>
+      <div className="theme-switch" role="radiogroup" aria-label="Tema">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={theme === "light"}
+          className={`button ${theme === "light" ? "" : "button--ghost"}`}
+          onClick={() => setTheme("light")}
+        >
+          Claro (padrão)
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={theme === "dark"}
+          className={`button ${theme === "dark" ? "" : "button--ghost"}`}
+          onClick={() => setTheme("dark")}
+        >
+          Escuro
+        </button>
+      </div>
+    </section>
+  );
+}
 
 function ChangePasswordSection() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -189,6 +225,7 @@ export function AccountSettingsPage() {
   return (
     <div className="trusted-people-page">
       <h1>Configurações de conta</h1>
+      <AppearanceSection />
       <ChangePasswordSection />
       <ExportDataSection />
       <DeactivateAccountSection />

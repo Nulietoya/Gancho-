@@ -5,6 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gancho</title>
+    <script>
+      // Aplica o tema salvo ANTES do React montar, pra não piscar o
+      // tema claro por uma fração de segundo em quem escolheu escuro.
+      // Mesma chave que `src/store/themeStore.ts` lê/escreve.
+      (function () {
+        try {
+          var theme = localStorage.getItem("gancho_theme");
+          if (theme === "dark") {
+            document.documentElement.dataset.theme = "dark";
+          }
+        } catch (e) {
+          // localStorage indisponível (modo privado, etc.) — fica no tema claro padrão.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
