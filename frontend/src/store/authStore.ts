@@ -17,6 +17,7 @@ import { ApiError, rawJson } from "../api/client";
 import type { TokenPair, UserPublic } from "../api/types";
 
 const REFRESH_TOKEN_KEY = "gancho_refresh_token";
+let refreshInFlight: Promise<string | null> | null = null;
 
 type AuthStatus = "idle" | "loading" | "authenticated" | "unauthenticated";
 
@@ -114,6 +115,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    if (refreshInFlight) await refreshInFlight;
     const refreshToken = get().refreshToken;
     if (refreshToken) {
       try {
@@ -130,21 +132,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ accessToken: null, refreshToken: null, user: null, status: "unauthenticated", error: null });
   },
 
-  refresh: async () => {
-    const refreshToken = get().refreshToken;
-    if (!refreshToken) return null;
-    try {
-      const tokens = await rawJson<TokenPair>("/auth/refresh", {
-        method: "POST",
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-      localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
-      set({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token });
-      return tokens.access_token;
-    } catch {
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      set({ accessToken: null, refreshToken: null, user: null, status: "unauthenticated" });
-      return null;
-    }
+  refresh: () => {
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = (async () => {
+      const refreshToken = get().refreshToken;
+      if (!refreshToken) return null;
+      try {
+        const tokens = await rawJson<TokenPair>("/auth/refresh", {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+        set({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token });
+        return tokens.access_token;
+      } catch {
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        set({ accessToken: null, refreshToken: null, user: null, status: "unauthenticated" });
+        return null;
+      }
+    })();
+    void refreshInFlight.finally(() => {
+      refreshInFlight = null;
+    });
+    return refreshInFlight;
   },
 }));
+
