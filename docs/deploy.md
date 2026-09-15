@@ -76,8 +76,8 @@ não faz nada se o banco já está no estado mais recente.
 - **`api`** — a mesma imagem de `backend/Dockerfile`, agora rodando
   sem `--reload` e com um worker. O scheduler roda dentro desse worker;
   múltiplos workers disparariam os jobs mais de uma vez. O Caddy é o
-  único ponto de entrada externo, e o Uvicorn confia nos cabeçalhos
-  encaminhados pela rede interna para aplicar o rate limit por IP real.
+  único ponto de entrada externo; o rate limit só aceita o IP
+  encaminhado se a conexão vier do próprio Caddy.
 - **`frontend`** — build estático do React (Vite) servido por nginx;
   `VITE_API_BASE_URL` é gravado dentro do JS no momento do BUILD da
   imagem, não pode ser trocado só reiniciando o container — mudou o
