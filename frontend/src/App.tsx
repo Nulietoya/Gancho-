@@ -11,6 +11,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MedicationsPage } from "./pages/MedicationsPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 import { PersonalPlanPage } from "./pages/PersonalPlanPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
@@ -34,6 +35,7 @@ export function App() {
           <Route path="/rede-de-confianca" element={<TrustedPeoplePage />} />
           <Route path="/aceitar-convite" element={<AcceptInvitePage />} />
           <Route path="/medicamentos" element={<MedicationsPage />} />
+          <Route path="/notificacoes" element={<NotificationsPage />} />
           <Route path="/rotina" element={<RoutinePage />} />
           <Route path="/alertas" element={<AlertsPage />} />
           <Route path="/painel-analitico" element={<AnalyticsPage />} />
@@ -49,3 +51,4 @@ export function App() {
     </Routes>
   );
 }
+
