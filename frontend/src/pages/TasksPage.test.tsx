@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TaskPublic, TaskStatus } from "../api/types";
 import { TaskCard } from "./TasksPage";
+import { postponeTask } from "../api/tasks";
 
 // api/tasks faz chamadas de rede reais — mockado pra este teste olhar
 // só a UI (quais botões aparecem por status), não o fetch em si.
@@ -95,3 +96,14 @@ describe("TaskCard — botões de ação visíveis por status", () => {
     expect(screen.getByText(/sugerida por Maria/i)).toBeInTheDocument();
   });
 });
+
+it("mantém o formulário de adiamento quando a API falha", async () => {
+  vi.mocked(postponeTask).mockRejectedValueOnce(new Error("falha"));
+  render(<TaskCard task={makeTask("pending")} relationshipLabel={null} onChanged={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Adiar" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar adiamento" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Confirmar adiamento" })).toBeEnabled());
+  expect(screen.getByText("Por que adiar")).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(/não foi possível atualizar a tarefa/i);
+});
+
