@@ -8,12 +8,10 @@ infraestrutura compartilhada entre processos (Redis) — mesmo padrão
 de cautela já registrado contra Celery/Redis neste projeto.
 
 Na prática, `slowapi` (wrapper fino sobre `limits`) guarda o contador
-em memória do próprio processo por padrão — suficiente pra uma
-implantação de uma instância só, que é o que este MVP tem hoje — e
-migra pra um backend compartilhado só trocando `storage_uri` na
-construção do `Limiter`, sem mudar nenhuma rota, no dia em que rodar
-mais de um worker/processo atrás de um load balancer. Não há motivo
-pra adiantar essa complexidade agora.
+em memória do próprio processo por padrão — suficiente para o deploy atual, que força um único worker de API.
+Antes de adicionar workers ou réplicas, configure armazenamento
+compartilhado (`storage_uri`) para os contadores e mova o scheduler
+para um processo único.
 
 Só ativo em produção, de propósito: em dev/test o limite não protege
 nada real (localhost não é superfície de ataque de verdade) e só
