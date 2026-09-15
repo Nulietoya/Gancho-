@@ -2621,3 +2621,88 @@ do item 9-12 — Executivo, Evitação, Ativação, Estabilidade — que
 comparam o valor recente de cada indicador contra o baseline desta
 etapa e decidem se o desvio é persistente o suficiente pra importar;
 é aqui que a amostra mínima confiável finalmente vira regra).
+
+## 2026-09-15 — Correções pós-implantação: e-mail real e convite de rede de confiança
+
+Duas lacunas reais, achadas só depois do deploy em produção (ETAPA 35),
+ao testar o sistema de e-mail de ponta a ponta pela primeira vez com
+credenciais reais — nenhuma delas era visível pelos 226 testes
+automatizados existentes até então, porque nenhum teste exercitava a
+entrega de e-mail de verdade nem a tela que o link de e-mail abre.
+
+### 1. Provedor de e-mail: SMTP não funciona no plano usado
+
+Configurar SMTP (Gmail) travava a requisição de reset de senha por
+tempo indefinido, em vez de falhar rápido. Causa raiz: o provedor de
+hospedagem usado bloqueia SMTP de saída por completo nos planos
+gratuitos/trial, pra evitar abuso — a porta fica "sem resposta" (não
+"conexão recusada"), e o código não tinha timeout de rede, então a
+requisição nunca liberava o worker que a atendia.
+
+- `app/core/email.py`: `RESEND_API_KEY` (provedor de e-mail via API
+  HTTPS, porta 443 — nunca bloqueada por essa política) passou a ter
+  prioridade sobre SMTP; timeout explícito de 10s nos dois caminhos;
+  falha de envio nunca propaga pra quem chamou `send_email` — só
+  registra no log, nunca derruba cadastro/reset.
+- Achado um segundo problema no mesmo teste: o remetente usado pro
+  Resend não pode ser um e-mail qualquer (ex.: Gmail do usuário) — o
+  provedor rejeita com 403 por ser falsificação de remetente. Sem um
+  domínio próprio verificado, o remetente cai no domínio de teste do
+  provedor, que só entrega pro e-mail da própria conta cadastrada
+  nele. **Limitação que continua valendo**: enquanto nenhum domínio
+  for verificado em resend.com/domains, e-mail de sistema (reset,
+  convite, notificação) só chega de verdade pra quem tem conta no
+  provedor de e-mail — pra qualquer outro destinatário, cai só no
+  registro interno (mesmo comportamento seguro de antes, nunca quebra
+  o fluxo).
+- `RESEND_FROM_EMAIL` (opcional): quando um domínio for verificado,
+  aponta o remetente pra ele, sem mudar código nenhum.
+
+### 2. Bug real: convite de pessoa de confiança nunca chegava a ninguém
+
+Achado ao seguir o mesmo teste de ponta a ponta pro fluxo de convite.
+Desde a ETAPA 14 (rede de confiança), `invite_trusted_person` sempre
+gerou e gravou o código do convite no banco — e sempre gravou um
+`AuditLog` com ação `INVITE_SENT`, apesar de nenhum e-mail jamais ter
+sido enviado de fato. A resposta da API (`RelationshipPublic`) também
+nunca incluiu o código, então não existia nem forma automática nem
+forma manual da pessoa convidada saber que tinha sido convidada — o
+convite ficava permanentemente preso no servidor.
+
+- `trust_service.invite_trusted_person` agora chama `email.send_email`
+  de verdade (mesmo caminho do reset de senha — nunca lança, só loga
+  se falhar).
+- Novo schema `InviteCreatedResponse` (só na resposta de
+  `POST /trusted-people/invite`, nunca em `GET /trusted-people` nem em
+  qualquer outra resposta de relacionamento) inclui `invite_token` —
+  quem convidou sempre tem o código/link pra copiar e mandar por
+  qualquer canal, mesmo se o e-mail não chegar.
+- Frontend: `TrustedPeoplePage` mostra o link de aceite depois de cada
+  convite bem-sucedido (reforço manual, sempre visível, não só quando
+  o e-mail falha — o backend não confirma entrega, então não dá pra
+  saber do lado do cliente se é necessário); `AcceptInvitePage` lê
+  `?token=` da URL e pré-preenche, pra o link do e-mail abrir direto
+  no formulário em vez de exigir colar o código na mão.
+- Teste de regressão novo (`test_invite_response_includes_token_but_list_does_not`):
+  confirma que o token na resposta do convite é o token real (usável
+  pra aceitar) e que `GET /trusted-people` continua sem expô-lo.
+
+### Por que só apareceu agora
+
+As duas lacunas já existiam desde a implementação original (ETAPA 22
+pro e-mail, ETAPA 14 pro convite) — nenhuma foi introduzida por
+mudança recente. Os testes automatizados sempre validaram a metade
+"escreve no banco" de cada fluxo, nunca a metade "chega pra fora"
+(entrega de e-mail real, ou a página que o link do e-mail abre).
+Reforça a lição já registrada na ETAPA 27: testes automatizados
+provam que o código faz o que o teste pede, não que o produto
+funciona ponta a ponta pra quem usa de fora.
+
+### Verificação
+
+- 226 testes de backend passam (225 anteriores + 1 novo).
+- 25 testes de frontend + build (`tsc` + `vite`) continuam limpos.
+- Verificado em produção: reset de senha entrega e-mail de verdade
+  pro Resend (confirmado sem erro no log); convite grava o token
+  corretamente e a resposta da API o inclui — sem regressão no
+  isolamento de quem cada relacionamento pertence.

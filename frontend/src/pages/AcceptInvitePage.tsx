@@ -1,11 +1,15 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { acceptInvite } from "../api/trustedPeople";
 import { describeError } from "../api/client";
 import type { RelationshipPublic } from "../api/types";
 
 export function AcceptInvitePage() {
-  const [token, setToken] = useState("");
+  const [searchParams] = useSearchParams();
+  // O e-mail de convite (e o link manual mostrado pra quem convidou)
+  // já trazem `?token=...` — preenche sozinho, mas continua editável
+  // pra quem preferir colar o código na mão.
+  const [token, setToken] = useState(searchParams.get("token") ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [accepted, setAccepted] = useState<RelationshipPublic | null>(null);

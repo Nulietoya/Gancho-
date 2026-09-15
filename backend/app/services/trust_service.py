@@ -17,6 +17,8 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core import email
+from app.core.config import get_settings
 from app.core.exceptions import InvalidInviteToken, RelationshipNotFound
 from app.core.time import utc_now
 from app.core.security import generate_opaque_token
@@ -30,6 +32,17 @@ from app.models.user import Profile, User
 def invite_trusted_person(
     db: Session, owner: User, invite_email: str, relationship_label: str | None
 ) -> TrustedPersonRelationship:
+    """
+    Bug real corrigido: até esta revisão, o convite gerava e gravava
+    `invite_token` no banco, mas nunca saía dali — `AuditAction.
+    INVITE_SENT` era gravado no log de auditoria mesmo sem nenhum
+    e-mail de fato ter sido enviado. Agora manda de verdade (mesmo
+    caminho de `send_email` do reset de senha — nunca lança, só loga
+    se falhar, então um provedor fora do ar não impede o convite de
+    ser criado). O código também continua disponível na resposta da
+    API (`InviteCreatedResponse`), pra quem convidou copiar e mandar
+    na mão se o e-mail não chegar.
+    """
     now = utc_now()
     relationship = TrustedPersonRelationship(
         owner_user_id=owner.id,
@@ -53,6 +66,20 @@ def invite_trusted_person(
         )
     )
     db.commit()
+
+    settings = get_settings()
+    accept_link = f"{settings.frontend_url}/aceitar-convite?token={relationship.invite_token}"
+    email.send_email(
+        invite_email,
+        "Gancho — convite para rede de confiança",
+        f"{owner.email} convidou você para ser pessoa de confiança dela(e) no Gancho.\n\n"
+        f"Pra aceitar, abra o link abaixo:\n{accept_link}\n\n"
+        f"Se o link não abrir, entre no Gancho e cole este código na tela de aceitar convite:\n"
+        f"{relationship.invite_token}\n\n"
+        f"Você só vai poder ver o que essa pessoa autorizar depois, permissão por permissão — "
+        f"aceitar o convite não dá acesso a nada por si só.\n\n"
+        f"Se você não esperava este convite, pode ignorar este e-mail.",
+    )
     return relationship
 
 

@@ -21,6 +21,7 @@ from app.schemas.personal_plan import PersonalPlanPublic
 from app.schemas.task import SuggestTaskRequest, TaskPublic
 from app.schemas.trust import (
     AcceptInviteRequest,
+    InviteCreatedResponse,
     InviteRequest,
     ObservationCreate,
     ObservationPublic,
@@ -33,7 +34,7 @@ from app.services import dashboard_service, intervention_service, personal_plan_
 router = APIRouter(prefix="/trusted-people", tags=["trusted-people"])
 
 
-@router.post("/invite", response_model=RelationshipPublic, status_code=status.HTTP_201_CREATED)
+@router.post("/invite", response_model=InviteCreatedResponse, status_code=status.HTTP_201_CREATED)
 def invite(
     payload: InviteRequest,
     current_user: User = Depends(get_current_user),

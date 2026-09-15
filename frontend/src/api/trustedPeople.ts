@@ -2,6 +2,7 @@ import { ApiError } from "./client";
 import { apiJson } from "./apiFetch";
 import type {
   InterventionPublic,
+  InviteCreatedResponse,
   ObservationCreate,
   ObservationPublic,
   PermissionUpdate,
@@ -17,8 +18,8 @@ export function listTrustedPeople(): Promise<RelationshipPublic[]> {
   return apiJson<RelationshipPublic[]>("/trusted-people");
 }
 
-export function inviteTrustedPerson(email: string, relationshipLabel: string | null): Promise<RelationshipPublic> {
-  return apiJson<RelationshipPublic>("/trusted-people/invite", {
+export function inviteTrustedPerson(email: string, relationshipLabel: string | null): Promise<InviteCreatedResponse> {
+  return apiJson<InviteCreatedResponse>("/trusted-people/invite", {
     method: "POST",
     body: JSON.stringify({ email, relationship_label: relationshipLabel }),
   });

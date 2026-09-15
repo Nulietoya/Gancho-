@@ -413,6 +413,11 @@ export interface RelationshipPublic {
   permissions: PermissionPublic[];
 }
 
+/** Só a resposta de `POST /trusted-people/invite` traz `invite_token` — nenhuma outra rota expõe. */
+export interface InviteCreatedResponse extends RelationshipPublic {
+  invite_token: string;
+}
+
 export interface PermissionUpdate {
   permission_key: PermissionKey;
   is_granted: boolean;

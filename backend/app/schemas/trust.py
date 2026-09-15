@@ -38,6 +38,24 @@ class RelationshipPublic(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class InviteCreatedResponse(RelationshipPublic):
+    """
+    Resposta de `POST /trusted-people/invite`, só nesse endpoint —
+    inclui `invite_token`, que `RelationshipPublic` (usado em
+    `GET /trusted-people` e em toda outra resposta de relacionamento)
+    deliberadamente não expõe.
+
+    Bug real corrigido aqui: até então, o código do convite era gerado
+    e gravado no banco, mas nunca saía dali — nem por e-mail (a chamada
+    pra enviar nunca existiu em `trust_service.invite_trusted_person`),
+    nem devolvido nesta resposta pra a pessoa dona da conta copiar e
+    mandar na mão. Resultado: nenhuma forma, automática ou manual, do
+    convite chegar a quem foi convidado. Ver docs/decisions.md.
+    """
+
+    invite_token: str
+
+
 class RelationshipAsTrustedPublic(RelationshipPublic):
     """
     ETAPA 27 (6ª leva): mesma forma de `RelationshipPublic`, do ponto de

@@ -32,6 +32,35 @@ def test_invite_creates_pending_relationship(client):
     assert body["permissions"] == []
 
 
+def test_invite_response_includes_token_but_list_does_not(client, db_session):
+    """
+    Regressão do bug real: o código do convite era gerado e gravado no
+    banco, mas não saía dali — nem por e-mail, nem devolvido na
+    resposta pra a pessoa dona copiar e mandar na mão. Confirma as
+    duas pontas: a resposta do POST inclui o token de verdade (usável
+    pra aceitar), e nenhuma outra resposta de relacionamento
+    (`GET /trusted-people`) o expõe.
+    """
+    owner_headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    response = client.post(
+        "/api/v1/trusted-people/invite", json={"email": TRUSTED_EMAIL}, headers=owner_headers
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert "invite_token" in body and body["invite_token"]
+
+    from app.models.trust import TrustedPersonRelationship
+
+    real_token = (
+        db_session.query(TrustedPersonRelationship).filter_by(invite_email=TRUSTED_EMAIL).one().invite_token
+    )
+    assert body["invite_token"] == real_token
+
+    listed = client.get("/api/v1/trusted-people", headers=owner_headers)
+    assert listed.status_code == 200
+    assert "invite_token" not in listed.json()[0]
+
+
 def test_accept_invite_rejects_wrong_email(client, db_session):
     owner_headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
     client.post(

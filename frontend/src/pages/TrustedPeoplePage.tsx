@@ -26,6 +26,12 @@ function InviteForm({ onInvited }: { onInvited: (relationship: RelationshipPubli
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Mostrado depois de qualquer convite bem-sucedido, exista ou não
+  // forma de saber se o e-mail chegou de verdade (o backend nunca
+  // confirma entrega, só tenta) — é o reforço manual: se o e-mail não
+  // chegar, a pessoa que convidou ainda tem o link/código pra mandar
+  // por qualquer outro canal.
+  const [lastInvite, setLastInvite] = useState<{ email: string; token: string } | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -34,6 +40,7 @@ function InviteForm({ onInvited }: { onInvited: (relationship: RelationshipPubli
     try {
       const relationship = await inviteTrustedPerson(email, label.trim() || null);
       onInvited(relationship);
+      setLastInvite({ email, token: relationship.invite_token });
       setEmail("");
       setLabel("");
     } catch (err) {
@@ -42,6 +49,10 @@ function InviteForm({ onInvited }: { onInvited: (relationship: RelationshipPubli
       setSubmitting(false);
     }
   }
+
+  const acceptLink = lastInvite
+    ? `${window.location.origin}/aceitar-convite?token=${lastInvite.token}`
+    : null;
 
   return (
     <section className="card">
@@ -74,6 +85,15 @@ function InviteForm({ onInvited }: { onInvited: (relationship: RelationshipPubli
           {submitting ? "Enviando…" : "Enviar convite"}
         </button>
       </form>
+      {lastInvite && acceptLink && (
+        <p className="checkin-hint invite-fallback">
+          Convite criado para <strong>{lastInvite.email}</strong>. Um e-mail foi enviado, mas não há garantia de
+          entrega (ex.: provedor de e-mail fora do ar) — se a pessoa não receber, mande este link direto por
+          qualquer outro canal (WhatsApp, SMS, etc.):
+          <br />
+          <code>{acceptLink}</code>
+        </p>
+      )}
     </section>
   );
 }
