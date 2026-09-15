@@ -74,13 +74,13 @@ a {
 }
 
 .app-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--spacing-3);
+  gap: var(--spacing-1) var(--spacing-3);
   padding: var(--spacing-2) var(--spacing-3);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
-  flex-wrap: wrap;
 }
 
 /* ETAPA 28: aviso de offline e tela de recuperação de erro de render */
@@ -112,14 +112,21 @@ a {
 
 .app-nav {
   display: flex;
-  gap: var(--spacing-2);
-  flex: 1;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--spacing-2);
 }
 
-.app-nav a {
+.app-nav a,
+.app-more summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   text-decoration: none;
   color: var(--color-text-muted);
-  padding: var(--spacing-1) 0;
+  padding: var(--spacing-1);
+  cursor: pointer;
 }
 
 .app-nav a.active {
@@ -128,8 +135,52 @@ a {
   border-bottom: 2px solid var(--color-primary);
 }
 
+.app-more summary.active {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.app-more {
+  position: relative;
+}
+
+.app-more summary {
+  list-style: none;
+}
+
+.app-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-more summary::after {
+  content: " ▾";
+  margin-left: 4px;
+}
+
+.app-more__menu {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px #2f2b2620;
+}
+
+.app-more__menu a.active {
+  border-bottom: 0;
+  background: var(--color-green-bg);
+  border-radius: 8px;
+}
+
 .app-user {
   display: flex;
+  grid-column: 2;
+  grid-row: 1;
   align-items: center;
   gap: var(--spacing-2);
 }
@@ -219,7 +270,10 @@ textarea {
 }
 
 input:focus,
-button:focus-visible {
+select:focus,
+textarea:focus,
+button:focus-visible,
+.app-more summary:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
 }
@@ -282,6 +336,14 @@ button:focus-visible {
 .card h2 {
   margin-top: 0;
   font-size: 1.05rem;
+}
+
+.notification-card--unread {
+  border-left: 4px solid var(--color-primary);
+}
+
+.notification-card p:first-child {
+  margin-top: 0;
 }
 
 .plain-list {
@@ -696,8 +758,20 @@ button:focus-visible {
   }
   .app-header {
     gap: var(--spacing-1);
+    padding: var(--spacing-1) var(--spacing-2);
+  }
+  .app-user__email {
+    display: none;
+  }
+  .app-user {
+    gap: 4px;
+  }
+  .app-user .button {
+    padding: 8px 10px;
+    font-size: 0.9rem;
   }
   .app-main {
     padding: var(--spacing-2);
   }
 }
+

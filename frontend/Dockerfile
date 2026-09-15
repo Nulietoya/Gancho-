@@ -6,7 +6,7 @@
 # `VITE_API_BASE_URL` precisa ser passado como build arg (não como
 # variável de ambiente do container em runtime) porque o Vite grava
 # esse valor DENTRO do JS compilado — ver docs/deploy.md.
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./

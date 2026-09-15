@@ -9,8 +9,8 @@
 #   # editar backend/.env.production com valores reais
 #   export DOMAIN=seu-dominio.com
 #   export VITE_API_BASE_URL=https://seu-dominio.com/api/v1
-#   docker compose -f docker-compose.prod.yml up --build -d
-#   docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+#   docker compose --env-file backend/.env.production -f docker-compose.prod.yml up --build -d
+#   docker compose --env-file backend/.env.production -f docker-compose.prod.yml exec api alembic upgrade head
 #
 # Diferenças de propósito em relação a docker-compose.yml (dev):
 # sem bind-mount do código (a imagem já tem tudo copiado — mudar
@@ -44,6 +44,7 @@ services:
       - ./backend/.env.production
     environment:
       DATABASE_URL: postgresql+psycopg2://gancho:${POSTGRES_PASSWORD}@db:5432/gancho
+      WEB_CONCURRENCY: "1"
     depends_on:
       db:
         condition: service_healthy

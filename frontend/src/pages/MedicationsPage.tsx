@@ -168,6 +168,7 @@ function MedicationCard({
   const [showAddSchedule, setShowAddSchedule] = useState(false);
   const [confirmingDiscontinue, setConfirmingDiscontinue] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,13 +176,22 @@ function MedicationCard({
       .then((result) => {
         if (!cancelled) setSchedules(result);
       })
-      .catch(() => {
-        if (!cancelled) setSchedules([]);
+      .catch((err) => {
+        if (!cancelled) setScheduleError(describeError(err, "não foi possível carregar os horários"));
       });
     return () => {
       cancelled = true;
     };
   }, [medication.id]);
+
+  async function retrySchedules() {
+    setScheduleError(null);
+    try {
+      setSchedules(await listSchedules(medication.id));
+    } catch (err) {
+      setScheduleError(describeError(err, "não foi possível carregar os horários"));
+    }
+  }
 
   async function handleDiscontinue() {
     try {
@@ -209,7 +219,7 @@ function MedicationCard({
       {!medication.discontinued_at && (
         <>
           <ul className="plain-list">
-            {schedules === null && <li className="checkin-hint">carregando horários…</li>}
+            {schedules === null && !scheduleError && <li className="checkin-hint">carregando horários…</li>}
             {schedules !== null && schedules.length === 0 && (
               <li className="checkin-hint">nenhum horário cadastrado ainda.</li>
             )}
@@ -219,6 +229,14 @@ function MedicationCard({
               </li>
             ))}
           </ul>
+          {scheduleError && (
+            <div>
+              <p className="form-error" role="alert">{scheduleError}</p>
+              <button type="button" className="button button--ghost" onClick={() => void retrySchedules()}>
+                Tentar novamente
+              </button>
+            </div>
+          )}
 
           <div className="relationship-card__actions">
             <button type="button" className="button button--ghost" onClick={() => setShowAddSchedule((v) => !v)}>
@@ -231,6 +249,7 @@ function MedicationCard({
               medicationId={medication.id}
               onCreated={(s) => {
                 setSchedules((prev) => [...(prev ?? []), s]);
+                setScheduleError(null);
                 setShowAddSchedule(false);
               }}
             />
@@ -323,3 +342,4 @@ export function MedicationsPage() {
     </div>
   );
 }
+
