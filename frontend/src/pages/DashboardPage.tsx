@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { describeError } from "../api/client";
 import { getDailyDashboard } from "../api/dashboard";
+import { notificationText } from "../api/notifications";
 import type { DailyDashboard, MedicationEventStatus } from "../api/types";
 import { MedicationDoseRow } from "../components/MedicationDoseRow";
 import { StateBadge } from "../components/StateBadge";
@@ -87,30 +88,6 @@ export function DashboardPage() {
         </section>
       )}
 
-      <section className="card">
-        <h2>Mais sobre você</h2>
-        <div className="relationship-card__actions">
-          <Link className="button button--ghost" to="/medicamentos">
-            Gerenciar medicamentos
-          </Link>
-          <Link className="button button--ghost" to="/rotina">
-            Ver rotina
-          </Link>
-          <Link className="button button--ghost" to="/alertas">
-            Alertas e explicação
-          </Link>
-          <Link className="button button--ghost" to="/painel-analitico">
-            Painel analítico
-          </Link>
-          <Link className="button button--ghost" to="/plano-pessoal">
-            Plano pessoal
-          </Link>
-          <Link className="button button--ghost" to="/configuracoes">
-            Configurações
-          </Link>
-        </div>
-      </section>
-
       {data.active_interventions.length > 0 && (
         <section className="card">
           <h2>Em andamento</h2>
@@ -122,14 +99,20 @@ export function DashboardPage() {
         </section>
       )}
 
-      <section className="card">
-        <h2>Notificações</h2>
-        <p>
-          {data.unread_notifications_count === 0
-            ? "Nenhuma notificação não lida."
-            : `${data.unread_notifications_count} não lida(s).`}
-        </p>
-      </section>
+      {data.unread_notifications_count > 0 && (
+        <section className="card">
+          <h2>Notificações</h2>
+          <p>Você tem {data.unread_notifications_count} não lida{data.unread_notifications_count === 1 ? "" : "s"}.</p>
+          <ul className="plain-list">
+            {data.recent_notifications.filter((item) => !item.read_at).slice(0, 3).map((item) => (
+              <li key={item.id}>{notificationText(item)}</li>
+            ))}
+          </ul>
+          <Link className="button button--ghost" to="/notificacoes">Ver notificações</Link>
+        </section>
+      )}
+
     </div>
   );
 }
+
