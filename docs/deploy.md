@@ -33,12 +33,13 @@ cp backend/.env.production.example backend/.env.production
 export DOMAIN=seu-dominio.com
 export VITE_API_BASE_URL=https://seu-dominio.com/api/v1
 
-docker compose -f docker-compose.prod.yml up --build -d
-docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+# --env-file fornece POSTGRES_PASSWORD para a interpolação do Compose.
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml up --build -d
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml exec api alembic upgrade head
 ```
 
 A primeira emissão de certificado pelo Caddy pode levar alguns
-segundos — acompanhe com `docker compose -f docker-compose.prod.yml
+segundos — acompanhe com `docker compose --env-file backend/.env.production -f docker-compose.prod.yml
 logs -f caddy` se `https://seu-dominio.com` não responder de
 imediato.
 
@@ -59,8 +60,8 @@ código.
 
 ```bash
 git pull
-docker compose -f docker-compose.prod.yml up --build -d
-docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml up --build -d
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml exec api alembic upgrade head
 ```
 
 `alembic upgrade head` é seguro de rodar mesmo sem migration nova —
@@ -73,12 +74,14 @@ não faz nada se o banco já está no estado mais recente.
   Porta 5432 NÃO é exposta pro host em produção (diferente do compose
   de dev) — só os outros serviços do compose alcançam o banco.
 - **`api`** — a mesma imagem de `backend/Dockerfile`, agora rodando
-  sem `--reload` e com `--workers` (padrão 2, ajustável via
-  `WEB_CONCURRENCY` em `backend/.env.production`).
+  sem `--reload` e com um worker. O scheduler roda dentro desse worker;
+  múltiplos workers disparariam os jobs mais de uma vez. O Caddy é o
+  único ponto de entrada externo, e o Uvicorn confia nos cabeçalhos
+  encaminhados pela rede interna para aplicar o rate limit por IP real.
 - **`frontend`** — build estático do React (Vite) servido por nginx;
   `VITE_API_BASE_URL` é gravado dentro do JS no momento do BUILD da
   imagem, não pode ser trocado só reiniciando o container — mudou o
-  domínio, precisa rebuildar (`docker compose -f
+  domínio, precisa rebuildar (`docker compose --env-file backend/.env.production -f
   docker-compose.prod.yml build frontend`).
 - **`caddy`** — único serviço exposto nas portas 80/443; emite e
   renova o certificado HTTPS sozinho (Let's Encrypt) e roteia
