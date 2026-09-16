@@ -2819,3 +2819,48 @@ cancelar e recriar o convite.
   inteira → link continuou aparecendo → aceitei de verdade com uma
   segunda conta em outro contexto de navegador → recarreguei a tela
   do dono → confirmado que o link some e o status vira "Ativo".
+
+## 2026-09-16 — Cartão de data/hora no painel "Hoje"
+
+### Contexto
+
+Pedido: "adicione um calendário no app, não o do Google, relógio com
+tempo real". Uma sessão separada do Claude (rodando no computador do
+usuário) tinha começado a integrar com o Google Calendar de verdade
+(OAuth, sincronização de medicação/tarefas) antes desse pedido — ao
+saber que não era isso, essa outra sessão descartou o trabalho (nada
+commitado) e propôs, em vez disso, um cartão simples de data/hora sem
+nenhuma API externa. Essa sessão não teve permissão de `git push`
+nesse repositório e chegou a gerar um `.patch` pra aplicar manualmente,
+mas o arquivo nunca chegou até aqui (ficou salvo em algum lugar do
+computador do usuário, fora da pasta conectada a esta sessão).
+
+Em vez de caçar esse arquivo por permissões de pasta adicionais,
+implementei a mesma ideia diretamente aqui, onde dá pra testar de
+ponta a ponta contra o Postgres real e publicar direto no Railway.
+
+### O que foi implementado
+
+- `frontend/src/hooks/useNow.ts`: hook que devolve um `Date` atualizado
+  a cada segundo (`setInterval` + `clearInterval` no cleanup) — só o
+  relógio do próprio navegador, nenhuma chamada de rede.
+- `frontend/src/components/DateTimeWidget.tsx`: cartão com a data por
+  extenso em pt-BR e o horário (`HH:MM:SS`), reaproveitando a classe
+  `.card` e as variáveis de cor já existentes — funciona nos dois
+  temas (claro/escuro) sem CSS condicional.
+- Adicionado no topo de `DashboardPage.tsx` (painel "Hoje"), antes do
+  `StateBadge`.
+
+### Verificação
+
+- 229 testes de backend continuam passando (nada foi tocado lá).
+- 3 testes novos de frontend (mostra data/hora corretas, avança
+  sozinho, limpa o intervalo ao desmontar) — 37 no total, todos
+  passando.
+- `tsc -b && vite build` e `oxlint` limpos.
+- Testado de verdade num navegador (não só teste automatizado): abri
+  a tela logada, conferi o relógio andando (21:48:06 → 21:48:08 em
+  segundos reais), e achei e corrigi um bug visual que só apareceria
+  olhando a tela — `text-transform: capitalize` no CSS deixava "De
+  Setembro De" com maiúscula em cada palavra; corrigido pra maiúscula
+  só na primeira letra, como o português pede.

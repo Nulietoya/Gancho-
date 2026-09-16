@@ -4,6 +4,7 @@ import { describeError } from "../api/client";
 import { getDailyDashboard } from "../api/dashboard";
 import { notificationText } from "../api/notifications";
 import type { DailyDashboard, MedicationEventStatus } from "../api/types";
+import { DateTimeWidget } from "../components/DateTimeWidget";
 import { MedicationDoseRow } from "../components/MedicationDoseRow";
 import { StateBadge } from "../components/StateBadge";
 
@@ -61,6 +62,7 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-page">
+      <DateTimeWidget />
       <StateBadge state={data.state} reason={data.state_reason} />
 
       <section className="card">
