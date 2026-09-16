@@ -2771,3 +2771,51 @@ personalidade visual.
   (login/esqueci-senha) foram inspecionadas visualmente, porque exigem
   sessão. A cobertura de variáveis é a mesma em todo o arquivo, então
   o risco é baixo, mas não é a mesma coisa que ter olhado.
+
+## 2026-09-16 — Link de convite recuperável (sem trocar a trava de e-mail)
+
+### Pedido original e ambiguidade
+
+O usuário pediu pra "adicionar pessoas de confiança" sem precisar do
+convite feito pelo app, "por um link alternativo que direciona apenas
+àquela sessão". Isso podia significar duas coisas bem diferentes: (a)
+manter a trava de segurança atual (o link só funciona pra quem entra
+com o e-mail exato convidado — Item 45 do documento de referência),
+só facilitando reencontrar/copiar esse link depois; ou (b) remover a
+trava de e-mail, deixando QUALQUER pessoa que abrisse o link virar
+pessoa de confiança. Como o app lida com dado de saúde mental, (b) é
+uma troca de segurança real — perguntei antes de mexer. Resposta:
+manter a trava (opção a).
+
+### O que foi implementado
+
+Lacuna real encontrada: o token do convite só aparecia na resposta do
+POST no exato momento da criação (`InviteCreatedResponse`). Se a
+pessoa saísse da tela ou desse F5 antes de copiar o link — por
+exemplo, porque o e-mail falhou e ela precisava mandar na mão por
+outro canal — não tinha como recuperar aquele link de novo sem
+cancelar e recriar o convite.
+
+- `OwnerRelationshipPublic` (novo schema, só em `GET /trusted-people`,
+  que é exclusivo do dono): volta a expor `invite_token`, mas SÓ
+  enquanto o convite está `pending`. Depois de aceito ou revogado, o
+  campo volta a `null` — o link já não serve pra nada, então não há
+  razão pra continuar mostrando. `RelationshipAsTrustedPublic` (usada
+  em `/watching`, do ponto de vista de quem já aceitou) não ganhou
+  esse campo — sem uso legítimo ali.
+- Frontend: `TrustedPeoplePage` agora mostra o link com um botão
+  "Copiar link" (feedback "Copiado!") tanto logo após criar o convite
+  quanto depois, em qualquer convite ainda pendente na lista — não
+  se perde mais ao sair da tela.
+
+### Verificação
+
+- 229 testes de backend (227 anteriores + 2 novos: lista reexpõe o
+  token enquanto pendente e zera após aceito; `/watching` nunca expõe
+  o campo).
+- 34 testes de frontend (31 anteriores + 3 novos).
+- Testado de ponta a ponta contra o backend real rodando localmente
+  (não só teste automatizado): criei convite → recarreguei a página
+  inteira → link continuou aparecendo → aceitei de verdade com uma
+  segunda conta em outro contexto de navegador → recarreguei a tela
+  do dono → confirmado que o link some e o status vira "Ativo".

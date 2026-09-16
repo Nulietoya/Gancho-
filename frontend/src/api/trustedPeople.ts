@@ -5,6 +5,7 @@ import type {
   InviteCreatedResponse,
   ObservationCreate,
   ObservationPublic,
+  OwnerRelationshipPublic,
   PermissionUpdate,
   PersonalPlanPublic,
   RelationshipAsTrustedPublic,
@@ -14,8 +15,8 @@ import type {
   TrustedDashboard,
 } from "./types";
 
-export function listTrustedPeople(): Promise<RelationshipPublic[]> {
-  return apiJson<RelationshipPublic[]>("/trusted-people");
+export function listTrustedPeople(): Promise<OwnerRelationshipPublic[]> {
+  return apiJson<OwnerRelationshipPublic[]>("/trusted-people");
 }
 
 export function inviteTrustedPerson(email: string, relationshipLabel: string | null): Promise<InviteCreatedResponse> {

@@ -56,6 +56,28 @@ class InviteCreatedResponse(RelationshipPublic):
     invite_token: str
 
 
+class OwnerRelationshipPublic(RelationshipPublic):
+    """
+    Resposta de `GET /trusted-people` (lista do DONO da conta, nunca
+    da pessoa de confiança). Traz `invite_token` de volta SÓ enquanto
+    o convite está pendente — depois de aceito ou revogado o link não
+    serve mais pra nada, então não há motivo pra continuar expondo o
+    valor.
+
+    Isso resolve uma lacuna real: antes, o token só aparecia na
+    resposta do momento exato da criação do convite (`InviteCreatedResponse`)
+    — se a pessoa saísse da tela ou desse F5 antes de copiar o link
+    (ex.: o e-mail falhou e ela precisava reenviar na mão por outro
+    canal), não tinha como recuperar aquele link de novo. Seguro
+    reexpor aqui porque esta rota já é isolada por dono (cada um só
+    vê os próprios relacionamentos) — nada muda pra quem NÃO é o
+    dono: `RelationshipAsTrustedPublic` (usada em `/watching`) segue
+    sem o campo.
+    """
+
+    invite_token: str | None = None
+
+
 class RelationshipAsTrustedPublic(RelationshipPublic):
     """
     ETAPA 27 (6ª leva): mesma forma de `RelationshipPublic`, do ponto de

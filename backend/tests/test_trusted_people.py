@@ -32,14 +32,19 @@ def test_invite_creates_pending_relationship(client):
     assert body["permissions"] == []
 
 
-def test_invite_response_includes_token_but_list_does_not(client, db_session):
+def test_invite_response_includes_token_and_list_reexposes_it_while_pending(client, db_session):
     """
     Regressão do bug real: o código do convite era gerado e gravado no
     banco, mas não saía dali — nem por e-mail, nem devolvido na
-    resposta pra a pessoa dona copiar e mandar na mão. Confirma as
-    duas pontas: a resposta do POST inclui o token de verdade (usável
-    pra aceitar), e nenhuma outra resposta de relacionamento
-    (`GET /trusted-people`) o expõe.
+    resposta pra a pessoa dona copiar e mandar na mão. Confirma que a
+    resposta do POST inclui o token de verdade (usável pra aceitar).
+
+    Além disso, confirma a decisão mais recente: `GET /trusted-people`
+    (só o dono vê a própria lista) volta a expor esse mesmo token
+    ENQUANTO o convite está pendente — pra quem saiu da tela antes de
+    copiar o link (ex.: o e-mail falhou) conseguir recuperá-lo depois,
+    sem precisar cancelar e criar um convite novo. Depois de aceito, o
+    link não serve mais pra nada, então o campo volta a ficar vazio.
     """
     owner_headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
     response = client.post(
@@ -56,9 +61,42 @@ def test_invite_response_includes_token_but_list_does_not(client, db_session):
     )
     assert body["invite_token"] == real_token
 
-    listed = client.get("/api/v1/trusted-people", headers=owner_headers)
-    assert listed.status_code == 200
-    assert "invite_token" not in listed.json()[0]
+    listed_pending = client.get("/api/v1/trusted-people", headers=owner_headers)
+    assert listed_pending.status_code == 200
+    assert listed_pending.json()[0]["invite_token"] == real_token
+
+    trusted_headers = _register_and_login(client, TRUSTED_EMAIL, TRUSTED_PASSWORD)
+    accept_response = client.post(
+        "/api/v1/trusted-people/accept", json={"invite_token": real_token}, headers=trusted_headers
+    )
+    assert accept_response.status_code == 200
+
+    listed_accepted = client.get("/api/v1/trusted-people", headers=owner_headers)
+    assert listed_accepted.status_code == 200
+    assert listed_accepted.json()[0]["invite_token"] is None
+
+
+def test_watching_list_never_exposes_invite_token(client, db_session):
+    """
+    O campo novo só existe na resposta do DONO (`GET /trusted-people`).
+    A pessoa de confiança vendo sua própria lista de quem observa
+    (`GET /trusted-people/watching`) usa um schema diferente
+    (`RelationshipAsTrustedPublic`) que nunca ganhou esse campo — o
+    convite já foi aceito por ela mesma, então não haveria uso
+    legítimo, e continua não sendo exposto por padrão.
+    """
+    owner_headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    invite_response = client.post(
+        "/api/v1/trusted-people/invite", json={"email": TRUSTED_EMAIL}, headers=owner_headers
+    )
+    raw_token = invite_response.json()["invite_token"]
+
+    trusted_headers = _register_and_login(client, TRUSTED_EMAIL, TRUSTED_PASSWORD)
+    client.post("/api/v1/trusted-people/accept", json={"invite_token": raw_token}, headers=trusted_headers)
+
+    watching = client.get("/api/v1/trusted-people/watching", headers=trusted_headers)
+    assert watching.status_code == 200
+    assert "invite_token" not in watching.json()[0]
 
 
 def test_accept_invite_rejects_wrong_email(client, db_session):

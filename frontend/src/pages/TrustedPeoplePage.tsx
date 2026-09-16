@@ -7,7 +7,7 @@ import {
   revokeRelationship,
   updatePermissions,
 } from "../api/trustedPeople";
-import type { ObservationPublic, PermissionUpdate, RelationshipPublic } from "../api/types";
+import type { OwnerRelationshipPublic, ObservationPublic, PermissionUpdate, RelationshipPublic } from "../api/types";
 import { PermissionEditor } from "../components/PermissionEditor";
 import {
   OBSERVATION_CATEGORY_LABELS,
@@ -21,7 +21,41 @@ function formatDate(iso: string | null): string | null {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
-function InviteForm({ onInvited }: { onInvited: (relationship: RelationshipPublic) => void }) {
+/**
+ * Link de convite pronto pra copiar e mandar por qualquer canal
+ * (WhatsApp, SMS etc.) — reaproveitado tanto logo após criar o
+ * convite quanto depois, pra convites ainda pendentes (`GET
+ * /trusted-people` volta a trazer o token enquanto pendente, ver
+ * `OwnerRelationshipPublic`). O link sozinho não basta pra entrar:
+ * quem abrir precisa criar/logar com o e-mail exato do convite
+ * (decisão de segurança já registrada no projeto).
+ */
+function CopyInviteLink({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}/aceitar-convite?token=${token}`;
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard indisponível (contexto não-seguro, navegador antigo) — o link
+      // continua visível em texto pra selecionar e copiar na mão.
+    }
+  }
+
+  return (
+    <div className="invite-link">
+      <code>{link}</code>
+      <button type="button" className="button button--ghost" onClick={() => void handleCopy()}>
+        {copied ? "Copiado!" : "Copiar link"}
+      </button>
+    </div>
+  );
+}
+
+function InviteForm({ onInvited }: { onInvited: (relationship: OwnerRelationshipPublic) => void }) {
   const [email, setEmail] = useState("");
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -49,10 +83,6 @@ function InviteForm({ onInvited }: { onInvited: (relationship: RelationshipPubli
       setSubmitting(false);
     }
   }
-
-  const acceptLink = lastInvite
-    ? `${window.location.origin}/aceitar-convite?token=${lastInvite.token}`
-    : null;
 
   return (
     <section className="card">
@@ -85,14 +115,14 @@ function InviteForm({ onInvited }: { onInvited: (relationship: RelationshipPubli
           {submitting ? "Enviando…" : "Enviar convite"}
         </button>
       </form>
-      {lastInvite && acceptLink && (
-        <p className="checkin-hint invite-fallback">
+      {lastInvite && (
+        <div className="checkin-hint invite-fallback">
           Convite criado para <strong>{lastInvite.email}</strong>. Um e-mail foi enviado, mas não há garantia de
           entrega (ex.: provedor de e-mail fora do ar) — se a pessoa não receber, mande este link direto por
-          qualquer outro canal (WhatsApp, SMS, etc.):
-          <br />
-          <code>{acceptLink}</code>
-        </p>
+          qualquer outro canal (WhatsApp, SMS, etc.). Se sair desta tela, dá pra achar o mesmo link de novo na lista
+          abaixo, enquanto o convite continuar pendente.
+          <CopyInviteLink token={lastInvite.token} />
+        </div>
       )}
     </section>
   );
@@ -147,7 +177,7 @@ function RelationshipCard({
   relationship,
   onUpdated,
 }: {
-  relationship: RelationshipPublic;
+  relationship: OwnerRelationshipPublic;
   onUpdated: (relationship: RelationshipPublic) => void;
 }) {
   const [showPermissions, setShowPermissions] = useState(false);
@@ -198,6 +228,15 @@ function RelationshipCard({
         {isRevoked && `revogado em ${formatDate(relationship.revoked_at)}`}
       </p>
 
+      {relationship.status === "pending" && relationship.invite_token && (
+        <div className="relationship-card__invite-link">
+          <p className="checkin-hint">
+            Convite ainda não aceito. Só funciona pra quem entrar com o e-mail <strong>{relationship.invite_email}</strong>.
+          </p>
+          <CopyInviteLink token={relationship.invite_token} />
+        </div>
+      )}
+
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -245,7 +284,7 @@ function RelationshipCard({
 }
 
 export function TrustedPeoplePage() {
-  const [relationships, setRelationships] = useState<RelationshipPublic[] | null>(null);
+  const [relationships, setRelationships] = useState<OwnerRelationshipPublic[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -262,12 +301,24 @@ export function TrustedPeoplePage() {
     };
   }, []);
 
-  function handleInvited(relationship: RelationshipPublic) {
+  function handleInvited(relationship: OwnerRelationshipPublic) {
     setRelationships((prev) => [relationship, ...(prev ?? [])]);
   }
 
+  // `updatePermissions`/`revokeRelationship` respondem com `RelationshipPublic`
+  // (sem `invite_token` — só `GET /trusted-people`, que já espelhamos aqui,
+  // devolve esse campo). Preserva o token local enquanto o status continuar
+  // "pending"; qualquer outro status (ex.: revogado) zera — o link já não
+  // serve mais pra nada, e manter um token velho na tela mostraria um link
+  // morto (o backend rejeita aceitar um convite que não está mais pendente).
   function handleUpdated(updated: RelationshipPublic) {
-    setRelationships((prev) => (prev ?? []).map((r) => (r.id === updated.id ? updated : r)));
+    setRelationships((prev) =>
+      (prev ?? []).map((r) =>
+        r.id === updated.id
+          ? { ...r, ...updated, invite_token: updated.status === "pending" ? r.invite_token : null }
+          : r,
+      ),
+    );
   }
 
   return (

@@ -418,6 +418,18 @@ export interface InviteCreatedResponse extends RelationshipPublic {
   invite_token: string;
 }
 
+/**
+ * Espelha `OwnerRelationshipPublic` de `app/schemas/trust.py` — é o
+ * que `GET /trusted-people` de fato devolve (só pro dono, nunca pra
+ * pessoa de confiança). Traz `invite_token` de volta enquanto o
+ * convite está `pending`, pra recuperar o link de convite mesmo
+ * depois de sair da tela ou dar F5; vira `null` assim que aceito ou
+ * revogado.
+ */
+export interface OwnerRelationshipPublic extends RelationshipPublic {
+  invite_token: string | null;
+}
+
 export interface PermissionUpdate {
   permission_key: PermissionKey;
   is_granted: boolean;

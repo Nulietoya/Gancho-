@@ -12,7 +12,7 @@ from app.core.exceptions import (
     PersonalPlanNotFound,
     RelationshipNotFound,
 )
-from app.models.enums import PermissionKey, TaskOrigin
+from app.models.enums import PermissionKey, RelationshipStatus, TaskOrigin
 from app.models.trust import TrustedPersonRelationship
 from app.models.user import User
 from app.schemas.dashboard import TrustedDashboard
@@ -25,6 +25,7 @@ from app.schemas.trust import (
     InviteRequest,
     ObservationCreate,
     ObservationPublic,
+    OwnerRelationshipPublic,
     PermissionsUpdateRequest,
     RelationshipAsTrustedPublic,
     RelationshipPublic,
@@ -55,12 +56,19 @@ def accept(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="convite inválido, já usado ou endereçado a outro e-mail")
 
 
-@router.get("", response_model=list[RelationshipPublic])
+@router.get("", response_model=list[OwnerRelationshipPublic])
 def list_my_trusted_people(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return trust_service.list_relationships_for_owner(db, current_user)
+    relationships = trust_service.list_relationships_for_owner(db, current_user)
+    return [
+        OwnerRelationshipPublic(
+            **RelationshipPublic.model_validate(relationship).model_dump(),
+            invite_token=relationship.invite_token if relationship.status == RelationshipStatus.PENDING else None,
+        )
+        for relationship in relationships
+    ]
 
 
 @router.get("/watching", response_model=list[RelationshipAsTrustedPublic])
