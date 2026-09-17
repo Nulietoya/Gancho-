@@ -1,12 +1,22 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { describeError } from "../api/client";
 import { useAuthStore } from "../store/authStore";
+
+/** Mesma trava de `LoginPage` — nunca segue um `redirect` pra fora do app. */
+function safeRedirect(raw: string | null): string {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  return "/";
+}
 
 export function RegisterPage() {
   const register = useAuthStore((s) => s.register);
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [searchParams] = useSearchParams();
+  // Mesmo propósito de `LoginPage`: volta pro link de convite depois
+  // de criar a conta, em vez de cair no painel "/" sem contexto.
+  const redirect = safeRedirect(searchParams.get("redirect"));
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +34,7 @@ export function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password);
-      navigate("/", { replace: true });
+      navigate(redirect, { replace: true });
     } catch (err) {
       setError(describeError(err, "não foi possível criar a conta"));
     } finally {
@@ -78,7 +88,10 @@ export function RegisterPage() {
           {submitting ? "Criando conta…" : "Criar conta"}
         </button>
         <p className="auth-switch">
-          Já tem conta? <Link to="/entrar">Entrar</Link>
+          Já tem conta?{" "}
+          <Link to={`/entrar?${new URLSearchParams({ redirect, ...(email ? { email } : {}) }).toString()}`}>
+            Entrar
+          </Link>
         </p>
       </form>
     </div>

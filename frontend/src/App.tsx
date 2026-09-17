@@ -28,12 +28,19 @@ export function App() {
       <Route path="/criar-conta" element={<RegisterPage />} />
       <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      {/*
+        Fora do ProtectedRoute de propósito: quem abre um link de
+        convite ainda não está logado nesta conta na maioria das
+        vezes (bug real corrigido aqui — ver docs/decisions.md). A
+        própria página decide o que mostrar: sem sessão, pede login
+        ou cadastro preservando o token; logado, segue o fluxo normal.
+      */}
+      <Route path="/aceitar-convite" element={<AcceptInvitePage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/checkin" element={<CheckinPage />} />
           <Route path="/rede-de-confianca" element={<TrustedPeoplePage />} />
-          <Route path="/aceitar-convite" element={<AcceptInvitePage />} />
           <Route path="/medicamentos" element={<MedicationsPage />} />
           <Route path="/notificacoes" element={<NotificationsPage />} />
           <Route path="/rotina" element={<RoutinePage />} />

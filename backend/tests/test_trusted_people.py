@@ -76,6 +76,59 @@ def test_invite_response_includes_token_and_list_reexposes_it_while_pending(clie
     assert listed_accepted.json()[0]["invite_token"] is None
 
 
+def test_invite_preview_works_without_login_and_shows_owner_identity(client, db_session):
+    """
+    `GET /trusted-people/invite-preview/{token}` é a única rota deste
+    módulo sem `Authorization` — regressão do bug real encontrado em
+    produção: a pessoa convidada só descobria que estava logada com o
+    e-mail errado DEPOIS de tentar aceitar (erro genérico). Este
+    preview deixa a tela de aceite mostrar "convite de <dono> para
+    <invite_email>" sem exigir login nenhum antes.
+    """
+    owner_headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    invite_response = client.post(
+        "/api/v1/trusted-people/invite", json={"email": TRUSTED_EMAIL}, headers=owner_headers
+    )
+    raw_token = invite_response.json()["invite_token"]
+
+    preview = client.get(f"/api/v1/trusted-people/invite-preview/{raw_token}")
+    assert preview.status_code == 200
+    body = preview.json()
+    assert body["invite_email"] == TRUSTED_EMAIL
+    assert body["owner_display_name"] == OWNER_EMAIL  # sem Profile.display_name ainda, cai pro e-mail
+    assert body["status"] == "pending"
+
+
+def test_invite_preview_404_for_unknown_token(client):
+    response = client.get("/api/v1/trusted-people/invite-preview/token-que-nao-existe")
+    assert response.status_code == 404
+
+
+def test_accept_response_includes_owner_display_name_not_invitee_email(client, db_session):
+    """
+    Bug real encontrado ao investigar por que um convite de verdade
+    não funcionava em produção: a tela de sucesso mostrava
+    `invite_email` (o e-mail de quem ACEITA, não do dono) como se
+    fosse a identidade do dono — "você agora é pessoa de confiança de
+    <seu próprio e-mail>". A resposta do accept precisa trazer
+    `owner_display_name` de verdade pra isso fazer sentido na tela.
+    """
+    owner_headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    invite_response = client.post(
+        "/api/v1/trusted-people/invite", json={"email": TRUSTED_EMAIL}, headers=owner_headers
+    )
+    raw_token = invite_response.json()["invite_token"]
+
+    trusted_headers = _register_and_login(client, TRUSTED_EMAIL, TRUSTED_PASSWORD)
+    accept_response = client.post(
+        "/api/v1/trusted-people/accept", json={"invite_token": raw_token}, headers=trusted_headers
+    )
+    assert accept_response.status_code == 200
+    body = accept_response.json()
+    assert body["owner_display_name"] == OWNER_EMAIL
+    assert body["invite_email"] == TRUSTED_EMAIL
+
+
 def test_watching_list_never_exposes_invite_token(client, db_session):
     """
     O campo novo só existe na resposta do DONO (`GET /trusted-people`).

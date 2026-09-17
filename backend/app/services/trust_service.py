@@ -105,6 +105,38 @@ def accept_invite(db: Session, invitee: User, raw_invite_token: str) -> TrustedP
     return relationship
 
 
+def get_relationship_by_token(db: Session, raw_invite_token: str) -> TrustedPersonRelationship:
+    """
+    Busca por token sem checar dono nem status — usada pelo preview
+    público (`GET /trusted-people/invite-preview/{token}`), que
+    precisa responder ANTES de saber quem está pedindo (ninguém
+    logado ainda). `accept_invite` não reusa esta função porque tem
+    sua própria regra de "só PENDING conta" — misturar as duas faria
+    o preview também aceitar convite já usado como se fosse válido.
+    """
+    relationship = db.scalar(
+        select(TrustedPersonRelationship).where(TrustedPersonRelationship.invite_token == raw_invite_token)
+    )
+    if relationship is None:
+        raise InvalidInviteToken()
+    return relationship
+
+
+def get_owner_display_name(db: Session, owner_user_id: uuid.UUID) -> str:
+    """
+    Nome pra mostrar o DONO pra quem é (ou pode vir a ser) a pessoa de
+    confiança dele — nunca o inverso (ver `RelationshipAsTrustedPublic`
+    e `InvitePreview`). Mesma regra de fallback usada em
+    `list_relationships_for_trusted_person`: `Profile.display_name`
+    quando o onboarding já foi feito, e-mail da conta quando não.
+    """
+    profile = db.scalar(select(Profile).where(Profile.user_id == owner_user_id))
+    if profile and profile.display_name:
+        return profile.display_name
+    owner = db.scalar(select(User).where(User.id == owner_user_id))
+    return owner.email if owner else ""
+
+
 def list_relationships_for_owner(db: Session, owner: User) -> list[TrustedPersonRelationship]:
     return list(
         db.scalars(

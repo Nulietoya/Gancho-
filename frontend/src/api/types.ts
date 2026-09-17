@@ -456,6 +456,16 @@ export interface OwnerRelationshipPublic extends RelationshipPublic {
   invite_token: string | null;
 }
 
+/**
+ * Espelha `InvitePreview` de `app/schemas/trust.py` — a ÚNICA chamada
+ * deste módulo que funciona sem estar logado (ver `previewInvite`).
+ */
+export interface InvitePreview {
+  invite_email: string;
+  owner_display_name: string;
+  status: RelationshipStatus;
+}
+
 export interface PermissionUpdate {
   permission_key: PermissionKey;
   is_granted: boolean;
