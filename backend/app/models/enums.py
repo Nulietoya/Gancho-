@@ -159,6 +159,7 @@ class IndicatorKey(str, enum.Enum):
     SLEEP_HOURS = "sleep_hours"
     WAKE_TIME_MINUTES = "wake_time_minutes"
     SLEEP_TIME_MINUTES = "sleep_time_minutes"
+    SLEEP_QUALITY = "sleep_quality"
     MOOD = "mood"
     ENERGY = "energy"
     ANXIETY = "anxiety"

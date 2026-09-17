@@ -13,7 +13,7 @@ from app.core.exceptions import MedicationNotFound, ScheduleNotFound
 from app.core.time import utc_now as _now
 from app.models.medication import Medication, MedicationEvent, MedicationSchedule
 from app.models.user import User
-from app.services import indicator_service
+from app.services import adherence_tips, indicator_service
 
 
 def create_medication(db: Session, user: User, data: dict) -> Medication:
@@ -109,6 +109,45 @@ def create_event(
     db.commit()
     db.refresh(event)
     return event
+
+
+def adherence_tip_for_event(db: Session, event: MedicationEvent) -> str | None:
+    """
+    Pedido do usuário: quando o MESMO motivo de não-adesão se repete,
+    sugerir uma estratégia concreta em vez de só registrar o motivo de
+    novo. Nunca gravado em lugar nenhum — recomputado a cada evento a
+    partir do histórico que já existe (mesmo raciocínio de
+    `explainability_service`: nunca inventa dado novo). Olha pra TODOS
+    os horários do mesmo medicamento (não só este `schedule_id`):
+    esquecer a dose da manhã e a da noite pelo mesmo motivo é o mesmo
+    padrão, não dois padrões diferentes.
+    """
+    if event.skip_reason is None:
+        return None
+    tip = adherence_tips.tip_for_reason(event.skip_reason)
+    if tip is None:
+        return None
+
+    schedule = db.get(MedicationSchedule, event.schedule_id)
+    if schedule is None:
+        return None
+
+    sibling_schedule_ids = select(MedicationSchedule.id).where(
+        MedicationSchedule.medication_id == schedule.medication_id
+    )
+    recent_same_reason = db.scalars(
+        select(MedicationEvent.id)
+        .where(
+            MedicationEvent.schedule_id.in_(sibling_schedule_ids),
+            MedicationEvent.skip_reason == event.skip_reason,
+        )
+        .order_by(MedicationEvent.scheduled_for.desc())
+        .limit(adherence_tips.REPEAT_THRESHOLD)
+    ).all()
+
+    if len(recent_same_reason) < adherence_tips.REPEAT_THRESHOLD:
+        return None
+    return tip
 
 
 def list_events_for_medication(db: Session, user: User, medication_id: uuid.UUID) -> list[MedicationEvent]:

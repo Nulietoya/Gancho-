@@ -197,6 +197,99 @@ def test_forgot_to_confirm_cannot_be_set_by_the_user(client):
     assert response.status_code == 422
 
 
+def test_adherence_tip_absent_on_first_occurrence_of_a_reason(client):
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med = _create_medication(client, headers)
+    schedule = _create_schedule(client, headers, med["id"])
+
+    response = client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{schedule['id']}/events",
+        json={"scheduled_for": "2026-09-12T08:00:00Z", "status": "not_taken", "skip_reason": "esqueci"},
+        headers=headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["adherence_tip"] is None
+
+
+def test_adherence_tip_appears_when_the_same_reason_repeats(client):
+    """Pedido do usuário: motivo repetido vira dica concreta, não só mais um registro igual."""
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med = _create_medication(client, headers)
+    schedule = _create_schedule(client, headers, med["id"])
+
+    client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{schedule['id']}/events",
+        json={"scheduled_for": "2026-09-12T08:00:00Z", "status": "not_taken", "skip_reason": "esqueci"},
+        headers=headers,
+    )
+    second = client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{schedule['id']}/events",
+        json={"scheduled_for": "2026-09-13T08:00:00Z", "status": "not_taken", "skip_reason": "esqueci"},
+        headers=headers,
+    )
+    assert second.status_code == 201
+    tip = second.json()["adherence_tip"]
+    assert tip is not None
+    assert "hábito" in tip.lower()
+
+
+def test_adherence_tip_counts_across_schedules_of_the_same_medication(client):
+    """Esquecer a dose da manhã e a da noite pelo mesmo motivo é o mesmo padrão."""
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med = _create_medication(client, headers)
+    morning = _create_schedule(client, headers, med["id"], "08:00:00")
+    night = _create_schedule(client, headers, med["id"], "22:00:00")
+
+    client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{morning['id']}/events",
+        json={"scheduled_for": "2026-09-12T08:00:00Z", "status": "not_taken", "skip_reason": "rotina_mudou"},
+        headers=headers,
+    )
+    second = client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{night['id']}/events",
+        json={"scheduled_for": "2026-09-12T22:00:00Z", "status": "not_taken", "skip_reason": "rotina_mudou"},
+        headers=headers,
+    )
+    assert second.json()["adherence_tip"] is not None
+
+
+def test_adherence_tip_never_appears_for_own_decision(client):
+    """DECISAO_PROPRIA fica sem dica de propósito — não questiona uma decisão informada."""
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med = _create_medication(client, headers)
+    schedule = _create_schedule(client, headers, med["id"])
+
+    client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{schedule['id']}/events",
+        json={"scheduled_for": "2026-09-12T08:00:00Z", "status": "skipped_deliberately", "skip_reason": "decisao_propria"},
+        headers=headers,
+    )
+    second = client.post(
+        f"/api/v1/medications/{med['id']}/schedules/{schedule['id']}/events",
+        json={"scheduled_for": "2026-09-13T08:00:00Z", "status": "skipped_deliberately", "skip_reason": "decisao_propria"},
+        headers=headers,
+    )
+    assert second.json()["adherence_tip"] is None
+
+
+def test_adherence_tip_never_shown_on_plain_listing(client):
+    """A dica é um nudge no momento do registro, não um rótulo permanente no histórico."""
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    med = _create_medication(client, headers)
+    schedule = _create_schedule(client, headers, med["id"])
+
+    for scheduled_for in ("2026-09-12T08:00:00Z", "2026-09-13T08:00:00Z"):
+        client.post(
+            f"/api/v1/medications/{med['id']}/schedules/{schedule['id']}/events",
+            json={"scheduled_for": scheduled_for, "status": "not_taken", "skip_reason": "esqueci"},
+            headers=headers,
+        )
+
+    events = client.get(f"/api/v1/medications/{med['id']}/events", headers=headers).json()
+    assert len(events) == 2
+    assert all(e["adherence_tip"] is None for e in events)
+
+
 def test_events_are_listed_across_schedules_of_the_same_medication(client):
     headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
     med = _create_medication(client, headers)

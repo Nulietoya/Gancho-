@@ -35,6 +35,7 @@ function ExplanationView({ explanation }: { explanation: AlertExplanation }) {
             há {engine.duration_days} dia(s)
             {engine.convergence_score !== null && ` — convergência ${engine.convergence_score.toFixed(2)}`}
           </p>
+          <p className="checkin-hint">{engine.scientific_context}</p>
           <ul className="plain-list">
             {engine.indicators.map((ind) => (
               <li key={ind.indicator_key}>

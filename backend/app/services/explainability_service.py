@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import DeviationEngine
 from app.models.user import User
-from app.schemas.explainability import AlertExplanation, EngineExplanation
+from app.schemas.explainability import AlertExplanation, EngineExplanation, TrustedAlertExplanation
 from app.services import alert_service
 
 
@@ -36,3 +36,17 @@ def explain_deviation_event(event) -> EngineExplanation:
 def explain_alert(db: Session, user: User, alert) -> AlertExplanation:
     active_events = alert_service.list_active_deviation_events(db, user)
     return AlertExplanation.from_alert(alert, active_events, total_engines=len(DeviationEngine))
+
+
+def explain_alert_for_trusted_person(db: Session, owner: User, alert) -> TrustedAlertExplanation:
+    """
+    Mesma fonte de dado de `explain_alert` (os `DeviationEvent`s ativos
+    do DONO, `owner` — nunca da pessoa de confiança que está chamando),
+    forma mais pobre de propósito (ver docstring de
+    `TrustedAlertExplanation`). Quem decide SE isto pode ser mostrado é
+    `dashboard_service.build_trusted_dashboard` (mesmo par permissão/
+    estado que já libera `state`/`state_reason`) — esta função nunca
+    checa permissão sozinha, mesmo padrão de todo o resto deste módulo.
+    """
+    active_events = alert_service.list_active_deviation_events(db, owner)
+    return TrustedAlertExplanation.from_alert(alert, active_events, total_engines=len(DeviationEngine))

@@ -65,7 +65,14 @@ from app.schemas.dashboard import (
 )
 from app.schemas.intervention import InterventionPublic
 from app.schemas.notification import NotificationPublic
-from app.services import alert_service, baseline_service, checkin_service, intervention_service, notification_service
+from app.services import (
+    alert_service,
+    baseline_service,
+    checkin_service,
+    explainability_service,
+    intervention_service,
+    notification_service,
+)
 from app.services.labels import ENGINE_LABELS, INDICATOR_LABELS
 
 DEFAULT_ANALYTICS_DAYS = 30
@@ -269,7 +276,7 @@ def build_trusted_dashboard(db: Session, relationship: TrustedPersonRelationship
         None,
     )
 
-    state = state_reason = None
+    state = state_reason = alert_explanation = None
     if owner is not None:
         alert = alert_service.get_current_alert(db, owner)
         if alert is not None:
@@ -280,6 +287,7 @@ def build_trusted_dashboard(db: Session, relationship: TrustedPersonRelationship
             )
             if reveals:
                 state, state_reason = alert.state, alert.reason_summary
+                alert_explanation = explainability_service.explain_alert_for_trusted_person(db, owner, alert)
 
     since = _now() - timedelta(days=DEFAULT_ANALYTICS_DAYS)
 
@@ -311,6 +319,7 @@ def build_trusted_dashboard(db: Session, relationship: TrustedPersonRelationship
         relationship_id=relationship.id,
         state=state,
         state_reason=state_reason,
+        alert_explanation=alert_explanation,
         medication_adherence=medication_adherence,
         indicators=indicators,
         alert_timeline=alert_timeline,

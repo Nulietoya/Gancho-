@@ -120,6 +120,8 @@ export interface MedicationEventPublic {
   skip_reason: MedicationSkipReason | null;
   custom_reason_text: string | null;
   confirmed_at: string | null;
+  /** Só vem preenchido quando o MESMO motivo de não-adesão já se repetiu — nunca gravado, nunca no histórico. */
+  adherence_tip: string | null;
 }
 
 /**
@@ -238,6 +240,8 @@ export interface EngineExplanation {
   duration_days: number;
   convergence_score: number | null;
   explanation: string;
+  /** Respaldo científico de por que esse tipo de desvio costuma ocorrer — nunca um número novo. */
+  scientific_context: string;
   indicators: IndicatorExplanation[];
 }
 
@@ -249,6 +253,27 @@ export interface AlertExplanation {
   total_engines: number;
   breadth_score: number | null;
   engines: EngineExplanation[];
+}
+
+/** Versão da explicação pra pessoa de confiança — mesmo motor,
+ * deliberadamente sem número por indicador (ver `TrustedAlertExplanation`
+ * no backend). */
+export interface TrustedEngineExplanation {
+  engine: DeviationEngine;
+  engine_label: string;
+  duration_days: number;
+  explanation: string;
+  scientific_context: string;
+}
+
+export interface TrustedAlertExplanation {
+  alert_id: string;
+  state: AlertState;
+  reason_summary: string;
+  engines_count: number;
+  total_engines: number;
+  breadth_score: number | null;
+  engines: TrustedEngineExplanation[];
 }
 
 export interface AlertTimelineEntry {
@@ -364,6 +389,7 @@ export type IndicatorKey =
   | "sleep_hours"
   | "wake_time_minutes"
   | "sleep_time_minutes"
+  | "sleep_quality"
   | "mood"
   | "energy"
   | "anxiety"
@@ -467,6 +493,7 @@ export interface TrustedDashboard {
   relationship_id: string;
   state: AlertState | null;
   state_reason: string | null;
+  alert_explanation: TrustedAlertExplanation | null;
   medication_adherence: MedicationAdherenceSummary | null;
   indicators: IndicatorTrend[] | null;
   alert_timeline: AlertTimelineEntry[] | null;

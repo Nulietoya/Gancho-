@@ -40,16 +40,18 @@ export function MedicationDoseRow({
   const [reason, setReason] = useState<MedicationSkipReason | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adherenceTip, setAdherenceTip] = useState<string | null>(null);
 
   async function confirm(status: MedicationEventStatus, skipReason: MedicationSkipReason | null) {
     setSaving(true);
     setError(null);
     try {
-      await createMedicationEvent(dose.medication_id, dose.schedule_id, {
+      const event = await createMedicationEvent(dose.medication_id, dose.schedule_id, {
         scheduled_for: todayScheduledFor(dose.time_of_day),
         status,
         skip_reason: skipReason,
       });
+      setAdherenceTip(event.adherence_tip);
       onConfirmed(dose.schedule_id, status);
     } catch (err) {
       setError(describeError(err, "não foi possível registrar"));
@@ -114,6 +116,8 @@ export function MedicationDoseRow({
           </div>
         </div>
       )}
+
+      {adherenceTip && <p className="dose-row__tip">{adherenceTip}</p>}
 
       {error && (
         <p className="form-error" role="alert">

@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from app.models.enums import AlertState, DeviationEngine, IndicatorKey, MedicationEventStatus
 from app.schemas.checkin import CheckInPublic
+from app.schemas.explainability import TrustedAlertExplanation
 from app.schemas.intervention import InterventionPublic
 from app.schemas.notification import NotificationPublic
 
@@ -114,6 +115,12 @@ class TrustedDashboard(BaseModel):
       aparecem se a pessoa tiver a permissão específica pra aquele
       estado (mesmo par permissão/estado já usado em
       `notification_service.notify_alert_state_change`).
+    - `alert_explanation`: MESMO gate de `state`/`state_reason` (nunca
+      um permission key novo) — por quê o estado é esse, com respaldo
+      científico de por que esse tipo de desvio costuma acontecer,
+      mas sem nenhum número por indicador (ver docstring de
+      `TrustedAlertExplanation`, que é uma forma deliberadamente mais
+      pobre que a explicação que o dono vê de si mesmo).
     - `medication_adherence`: `VIEW_MEDICATION` — só a taxa agregada
       dos últimos 30 dias, nunca o registro dose a dose.
     - `indicators`: `VIEW_SPECIFIC_INDICATORS` — só os indicadores
@@ -126,6 +133,7 @@ class TrustedDashboard(BaseModel):
     relationship_id: uuid.UUID
     state: AlertState | None
     state_reason: str | None
+    alert_explanation: TrustedAlertExplanation | None
     medication_adherence: MedicationAdherenceSummary | None
     indicators: list[IndicatorTrend] | None
     alert_timeline: list[AlertTimelineEntry] | None

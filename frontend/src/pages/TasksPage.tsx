@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { describeError } from "../api/client";
+import { FocusTimer } from "../components/FocusTimer";
 import {
   cancelTask,
   completeTask,
@@ -314,6 +315,8 @@ export function TasksPage() {
         Inclui tarefas que você criou e as sugeridas por alguém da sua rede de confiança — sugestão nunca começa
         automaticamente, fica pendente até você decidir o que fazer com ela.
       </p>
+
+      <FocusTimer />
 
       <CreateTaskForm onCreated={handleCreated} />
 

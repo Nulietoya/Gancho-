@@ -13,15 +13,25 @@ OWNER_PASSWORD = "senhaForte123"
 
 def test_checkin_feeds_functional_indicator(client):
     headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
-    client.post("/api/v1/checkins", json={"mood": 4, "energy": 3, "anxiety": 2}, headers=headers)
+    client.post(
+        "/api/v1/checkins",
+        json={"mood": 4, "energy": 3, "anxiety": 2, "sleep_quality": 5},
+        headers=headers,
+    )
 
     values = client.get("/api/v1/indicators?indicator_key=mood", headers=headers).json()
     assert len(values) == 1
     assert values[0]["value"] == 4.0
     assert values[0]["source"] == "checkin"
 
-    # sleep_quality não tem IndicatorKey correspondente ainda — não deve gerar indicador
     assert client.get("/api/v1/indicators?indicator_key=energy", headers=headers).json()[0]["value"] == 3.0
+
+    # sleep_quality tem IndicatorKey próprio (SLEEP_QUALITY) desde a
+    # migration 8a3f2c9b1e07 — não é misturado com SLEEP_HOURS.
+    sleep_values = client.get("/api/v1/indicators?indicator_key=sleep_quality", headers=headers).json()
+    assert len(sleep_values) == 1
+    assert sleep_values[0]["value"] == 5.0
+    assert sleep_values[0]["source"] == "checkin"
 
 
 def test_checkin_patch_updates_the_indicator_value(client):

@@ -100,5 +100,10 @@ class MedicationEventPublic(BaseModel):
     skip_reason: MedicationSkipReason | None
     custom_reason_text: str | None
     confirmed_at: datetime | None
+    # Nunca persistido — recomputado a cada evento (ver
+    # `medication_service.adherence_tip_for_event`). `None` na
+    # esmagadora maioria dos eventos; só aparece quando o MESMO motivo
+    # de não-adesão já se repetiu.
+    adherence_tip: str | None = None
 
     model_config = {"from_attributes": True}

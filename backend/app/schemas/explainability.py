@@ -3,6 +3,21 @@ ETAPA 20 — forma pública da explicação (item 15/22). Nunca traz um
 número que não exista já em `DeviationEvent`/`Alert`; é só a mesma
 informação organizada de um jeito navegável (por motor, por
 indicador, "seu normal" vs. "seu agora").
+
+`scientific_context`/`TrustedAlertExplanation` (pedido do usuário,
+sessão seguinte): texto fixo de `psychoeducation.py` sobre por que
+esse TIPO de desvio costuma ocorrer — nunca um número novo, mesma
+regra do resto do módulo. `TrustedAlertExplanation` é uma forma
+DELIBERADAMENTE mais pobre que `AlertExplanation`: nunca leva
+`IndicatorExplanation` (que expõe `baseline_mean`/`recent_value`
+numéricos) — pra pessoa de confiança, hoje, o texto agregado do motor
+já é o mesmo nível de detalhe que `Alert.reason_summary` expõe sob
+`RECEIVE_ALERT_YELLOW`/`RECEIVE_ALERT_RED` (ver `alert_service.
+_reason_summary`); número por indicador é dado que só `VIEW_SPECIFIC_
+INDICATORS` libera (`TrustedDashboard.indicators`), não o par
+permissão/estado que libera a explicação do alerta. Duas classes
+evitam ter que filtrar `EngineExplanation.indicators` por
+`indicator_scope` toda vez — mais simples e mais difícil de errar.
 """
 import uuid
 from datetime import datetime
@@ -10,6 +25,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.models.enums import AlertState, DeviationEngine, IndicatorKey
+from app.services import psychoeducation
 from app.services.labels import ENGINE_LABELS, INDICATOR_LABELS
 
 
@@ -58,6 +74,7 @@ class EngineExplanation(BaseModel):
     duration_days: int
     convergence_score: float | None
     explanation: str
+    scientific_context: str
     indicators: list[IndicatorExplanation]
 
     @classmethod
@@ -73,7 +90,29 @@ class EngineExplanation(BaseModel):
             duration_days=event.duration_days,
             convergence_score=event.convergence_score,
             explanation=event.explanation,
+            scientific_context=psychoeducation.owner_scientific_context(event.engine),
             indicators=indicators,
+        )
+
+
+class TrustedEngineExplanation(BaseModel):
+    """Mesma origem de `EngineExplanation`, versão sem número por
+    indicador (ver docstring do módulo) e com o texto psicoeducativo
+    voltado pra quem observa, não pra quem vive o desvio."""
+    engine: DeviationEngine
+    engine_label: str
+    duration_days: int
+    explanation: str
+    scientific_context: str
+
+    @classmethod
+    def from_deviation_event(cls, event) -> "TrustedEngineExplanation":
+        return cls(
+            engine=event.engine,
+            engine_label=ENGINE_LABELS.get(event.engine, event.engine.value),
+            duration_days=event.duration_days,
+            explanation=event.explanation,
+            scientific_context=psychoeducation.trusted_person_scientific_context(event.engine),
         )
 
 
@@ -89,6 +128,31 @@ class AlertExplanation(BaseModel):
     @classmethod
     def from_alert(cls, alert, active_events: list, total_engines: int) -> "AlertExplanation":
         engines = [EngineExplanation.from_deviation_event(e) for e in active_events]
+        return cls(
+            alert_id=alert.id,
+            state=alert.state,
+            reason_summary=alert.reason_summary,
+            engines_count=len(engines),
+            total_engines=total_engines,
+            breadth_score=(len(engines) / total_engines) if total_engines else None,
+            engines=engines,
+        )
+
+
+class TrustedAlertExplanation(BaseModel):
+    """Ver docstring do módulo: forma da explicação de alerta pra
+    pessoa de confiança, deliberadamente sem número por indicador."""
+    alert_id: uuid.UUID
+    state: AlertState
+    reason_summary: str
+    engines_count: int
+    total_engines: int
+    breadth_score: float | None
+    engines: list[TrustedEngineExplanation]
+
+    @classmethod
+    def from_alert(cls, alert, active_events: list, total_engines: int) -> "TrustedAlertExplanation":
+        engines = [TrustedEngineExplanation.from_deviation_event(e) for e in active_events]
         return cls(
             alert_id=alert.id,
             state=alert.state,

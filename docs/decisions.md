@@ -6,6 +6,107 @@ nova vai no topo.
 
 ---
 
+## 2026-09-17 — ETAPA 37: 4 features pedidas pelo usuário (pós-pesquisa de evidência científica sobre TDAH)
+
+### Contexto
+
+Sessão seguinte à ETAPA 36 ("projeto completo"). O usuário pediu uma
+pesquisa sobre o que a literatura mostra que ajuda de verdade quem tem
+TDAH (fora de qualquer app), e depois pediu pra implementar 4 achados
+dessa pesquisa direto no Gancho — não feature especulativa, cada uma
+rastreável a um achado específico. As 4 vieram junto numa única
+resposta do usuário ("faça" com múltipla seleção), tratadas aqui como
+uma etapa só por terem sido pedidas juntas, mas são independentes entre
+si (nenhuma depende de outra pra funcionar).
+
+### 1. Sono como indicador de baseline (`SLEEP_QUALITY`)
+
+O achado mais acionável da pesquisa: sono tem a relação causal mais
+bem documentada com sintomas de TDAH entre tudo que foi levantado
+(RCT 2026 mostrando que tratar sono melhora sintomas de TDAH no dia
+seguinte, não só o sono em si), e o próprio `indicator_service` já
+tinha uma decisão de escopo registrada dizendo que `sleep_quality`
+(campo do check-in desde a ETAPA 11, escala 1-5) ficava de fora do
+motor por não ter `IndicatorKey` correspondente — gap pronto, não
+inventado agora.
+
+Resolvido como o próprio código já previa: `IndicatorKey.SLEEP_QUALITY`
+novo (migration `8a3f2c9b1e07`, `ALTER TYPE ... ADD VALUE IF NOT EXISTS`
+dentro de `autocommit_block()` — Postgres não permite isso na mesma
+transação de outros comandos, e o downgrade é um no-op documentado
+porque Postgres não remove valor de enum), mapeado em
+`_CHECKIN_FIELD_TO_INDICATOR` e adicionado ao motor de ESTABILIDADE
+(`ENGINE_INDICATORS`), junto de adesão a medicação e humor — nunca
+`SLEEP_HOURS` (unidade/fonte diferente, ainda sem dado real). Zero
+mudança de frontend no formulário de check-in (o campo já existia lá
+desde a ETAPA 27); só `labels.ts`/`types.ts` espelhando o enum novo.
+
+### 2. Timer visual pra cegueira temporal (`FocusTimer`)
+
+Ferramenta puramente de frontend, deliberadamente independente do
+body doubling (ETAPA 21) — sem pedir nada a ninguém, sem gravar em
+lugar nenhum (nem `localStorage`: fechar a aba reseta de propósito,
+não é dado de produto). Disco SVG encolhendo em vez de só um número —
+é o mecanismo que timers visuais físicos (Time Timer) usam pra tornar
+tempo concreto pra quem tem TDAH, não um cronômetro comum com pele
+diferente. Presets de 5/10/15/25 min. Vive em `/tarefas`
+(`TasksPage.tsx`), acima do formulário de nova tarefa.
+
+### 3. Dica de aderência ligada a motivo repetido (`adherence_tips.py`)
+
+Quando o MESMO `skip_reason` se repete (limiar: 2ª ocorrência,
+contando em TODOS os horários do mesmo medicamento — esquecer manhã e
+noite pelo mesmo motivo é um padrão só), a resposta de
+`POST .../events` passa a trazer `adherence_tip` com uma estratégia de
+hábito concreta (hábito-âncora, redução de barreira, deixar visível —
+nunca instrução de dose/horário, item 13 continua valendo). Nunca
+persistido: recomputado a cada evento a partir do histórico que já
+existe, e nunca aparece em listagem (`GET .../events`) — é um nudge no
+momento do registro, não um rótulo permanente. `DECISAO_PROPRIA` fica
+de propósito sem dica — sugerir "estratégia" pra uma decisão informada
+que a pessoa já tomou contrariaria o tom do produto.
+
+### 4. Respaldo científico das variações — pro dono E pra pessoa de confiança (`psychoeducation.py`)
+
+Pedido explícito do usuário: dar respaldo científico do por que os
+desvios costumam ocorrer, tanto pro dono quanto pra pessoa de
+confiança, "que nem sempre entende essas mudanças e variações" (sem
+isso, o modelo mental disponível pra quem observa é "não fez o que
+prometeu de nada" lido como falta de caráter). Texto fixo por motor
+(nunca gerado, nunca personalizado a dado nenhum do usuário — mesma
+regra de "nunca diagnóstico" de todo o resto do produto), duas versões:
+
+- **Dono** (`EngineExplanation.scientific_context`, novo campo em cima
+  do que já existia desde a ETAPA 20): plugado direto na explicação de
+  alerta que o dono já vê.
+- **Pessoa de confiança** (`TrustedAlertExplanation`, schema NOVO,
+  deliberadamente mais pobre que `AlertExplanation`): nunca leva
+  `IndicatorExplanation` com número (`baseline_mean`/`recent_value`)
+  — hoje só `VIEW_SPECIFIC_INDICATORS` libera número por indicador
+  (`TrustedDashboard.indicators`), e o par permissão/estado que já
+  libera `state`/`state_reason`
+  (`RECEIVE_ALERT_YELLOW`/`RECEIVE_ALERT_RED`) nunca foi desenhado pra
+  liberar isso — dar número por essa porta seria abrir uma via nova de
+  vazamento de dado que o resto do produto trata como sensível.
+  `alert_explanation` no `TrustedDashboard` usa exatamente esse MESMO
+  gate já existente, sem permission key nova.
+
+### Verificação
+
+Backend: 236 testes (`pytest -q`, 230→236; `pytest --cov` confirma
+97% mantido — os poucos ramos novos não cobertos são defensivos,
+mesmo critério já registrado na ETAPA 33-34). Migration validada em
+ciclo `upgrade→downgrade→upgrade`. Teste dedicado provando que
+`TrustedAlertExplanation` de verdade não carrega número (`assert
+"baseline_mean" not in engine`), com um `DeviationEvent` REAL
+convergindo (não só `Alert` inserido direto) — pra garantir que
+`trusted_person_scientific_context` roda de verdade, não só que o
+schema aceitaria se rodasse. Frontend: `tsc -b` limpo, `oxlint` sem
+warning novo, 42 testes (`vitest run`, 37→42, incluindo 5 novos pro
+`FocusTimer` com fake timers, mesmo padrão de `DateTimeWidget.test.tsx`).
+
+---
+
 ## 2026-09-12 — ETAPA 36: documentação final
 
 ### Escopo desta etapa

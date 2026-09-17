@@ -24,4 +24,5 @@ INDICATOR_LABELS: dict[IndicatorKey, str] = {
     IndicatorKey.ENERGY: "sua energia",
     IndicatorKey.MEDICATION_ADHERENCE: "sua adesão à medicação",
     IndicatorKey.MOOD: "seu humor",
+    IndicatorKey.SLEEP_QUALITY: "sua qualidade de sono",
 }

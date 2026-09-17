@@ -337,6 +337,24 @@ export function TrustedDashboardPage() {
             )}
           </section>
 
+          {dashboard.alert_explanation && dashboard.alert_explanation.engines.length > 0 && (
+            <section className="card">
+              <h2>Por que isso costuma acontecer</h2>
+              <p className="checkin-hint">
+                Isto é informação geral sobre TDAH e procrastinação, não um diagnóstico dela(e) — o objetivo é
+                ajudar você a entender o que pode estar por trás das mudanças, não substituir uma conversa com ela(e).
+              </p>
+              <ul className="plain-list">
+                {dashboard.alert_explanation.engines.map((engine) => (
+                  <li key={engine.engine}>
+                    <strong>{engine.engine_label}</strong> — há {engine.duration_days} dia(s)
+                    <p>{engine.scientific_context}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {dashboard.medication_adherence && (
             <section className="card">
               <h2>Adesão à medicação (últimos {dashboard.medication_adherence.period_days} dias)</h2>

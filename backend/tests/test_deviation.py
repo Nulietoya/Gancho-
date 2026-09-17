@@ -75,6 +75,24 @@ def test_stability_engine_gap_in_checkins_breaks_the_streak(client):
     assert response.json() is None
 
 
+def test_stability_engine_detects_persistent_sleep_quality_drop(client):
+    """sleep_quality virou indicador do motor de ESTABILIDADE (migration
+    8a3f2c9b1e07) — mesmo raciocínio já testado pra humor/adesão."""
+    headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
+    for days_ago in range(12, 2, -1):
+        _post_checkin(client, headers, days_ago, sleep_quality=4)
+    for days_ago in (2, 1, 0):
+        _post_checkin(client, headers, days_ago, sleep_quality=1)
+
+    response = client.post("/api/v1/deviation/run/stability", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body is not None
+    assert body["engine"] == "stability"
+    assert "sleep_quality" in body["triggering_indicator_keys"]
+    assert body["duration_days"] >= 3
+
+
 def test_avoidance_engine_detects_persistent_anxiety_increase(client):
     headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)
     for days_ago in range(12, 2, -1):

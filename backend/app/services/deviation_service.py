@@ -25,7 +25,14 @@ sinal novo a um motor no futuro é só acrescentar uma linha em
     ATIVAÇÃO    — energia (queda = ruim); proxy até `LEFT_HOME` /
                   `SOCIAL_CONTACT` / `ACTIVITY_LEVEL` terem fonte real.
     ESTABILIDADE — adesão a medicação (queda = ruim), humor (queda =
-                  ruim).
+                  ruim), qualidade de sono autodeclarada (queda =
+                  ruim) — mudança de sono é sinal de alerta que o
+                  próprio usuário já reconhece no plano pessoal
+                  (`PersonalPlanSignal.SONO`); tratada aqui como parte
+                  da estabilidade geral, não de um motor à parte,
+                  porque a relação sono↔funcionamento é bidirecional
+                  e inespecífica (não aponta sozinha pra evitação
+                  nem pra déficit executivo).
 
 Cada indicador do motor é avaliado assim:
 1. Baseline precisa existir e ter pelo menos `MIN_BASELINE_SAMPLE`
@@ -96,6 +103,7 @@ ENGINE_INDICATORS: dict[DeviationEngine, list[tuple[IndicatorKey, int]]] = {
     DeviationEngine.STABILITY: [
         (IndicatorKey.MEDICATION_ADHERENCE, -1),
         (IndicatorKey.MOOD, -1),
+        (IndicatorKey.SLEEP_QUALITY, -1),
     ],
 }
 

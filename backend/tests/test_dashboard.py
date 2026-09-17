@@ -320,10 +320,43 @@ def test_trusted_dashboard_yellow_state_hidden_without_matching_permission(clien
     body = client.get(f"/api/v1/trusted-people/{relationship_id}/dashboard", headers=trusted_headers).json()
     assert body["state"] is None
     assert body["state_reason"] is None
+    assert body["alert_explanation"] is None
 
     _grant(client, owner_headers, relationship_id, PermissionKey.RECEIVE_ALERT_YELLOW.value)
     body = client.get(f"/api/v1/trusted-people/{relationship_id}/dashboard", headers=trusted_headers).json()
     assert body["state"] == "yellow"
+    # alert_explanation segue o MESMO gate de state/state_reason (pedido do
+    # usuário: respaldo científico das variações também pra quem observa) —
+    # nunca número por indicador, só o texto agregado por motor.
+    assert body["alert_explanation"] is not None
+    assert body["alert_explanation"]["state"] == "yellow"
+    assert "baseline_mean" not in str(body["alert_explanation"])
+
+
+def test_trusted_dashboard_alert_explanation_carries_real_scientific_context(client, db_session):
+    """Diferente do teste acima (Alert inserido direto, sem motor
+    nenhum convergindo): aqui o desvio é real, então `engines` vem
+    preenchido de verdade e `trusted_person_scientific_context` roda —
+    ver app/services/psychoeducation.py."""
+    owner_headers, trusted_headers, relationship_id = _fully_connected_relationship(client, db_session)
+    for days_ago in range(12, 2, -1):
+        _post_checkin(client, owner_headers, days_ago, mood=4)
+    for days_ago in (2, 1, 0):
+        _post_checkin(client, owner_headers, days_ago, mood=1)
+    client.post("/api/v1/deviation/run", headers=owner_headers)
+    client.post("/api/v1/alerts/sync", headers=owner_headers)
+
+    _grant(client, owner_headers, relationship_id, PermissionKey.RECEIVE_ALERT_YELLOW.value)
+    _grant(client, owner_headers, relationship_id, PermissionKey.RECEIVE_ALERT_RED.value)
+
+    body = client.get(f"/api/v1/trusted-people/{relationship_id}/dashboard", headers=trusted_headers).json()
+    explanation = body["alert_explanation"]
+    assert explanation is not None
+    assert len(explanation["engines"]) >= 1
+    engine = explanation["engines"][0]
+    assert engine["scientific_context"]
+    assert "baseline_mean" not in engine  # forma pobre de propósito — sem número por indicador
+    assert "indicators" not in engine
 
 
 def test_trusted_dashboard_red_state_requires_its_own_permission_not_yellows(client, db_session):

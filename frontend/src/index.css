@@ -389,6 +389,60 @@ button:focus-visible,
   color: var(--color-text-muted);
 }
 
+.focus-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-2);
+  text-align: center;
+}
+
+.focus-timer__presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-1);
+}
+
+.focus-timer__preset--active {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  border-color: var(--color-primary);
+}
+
+.focus-timer__dial {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focus-timer__track {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 10;
+}
+
+.focus-timer__progress {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.focus-timer__time {
+  position: absolute;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.focus-timer__done {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
 .datetime-widget__time {
   margin: 0;
   font-size: 1.4rem;
@@ -771,6 +825,15 @@ button:focus-visible,
   background: var(--color-bg);
   padding: var(--spacing-1) var(--spacing-2);
   border-radius: 8px;
+}
+
+.dose-row__tip {
+  background: var(--color-surface-muted);
+  border-left: 3px solid var(--color-primary);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: 8px;
+  color: var(--color-text);
+  margin: 0;
 }
 
 .schedule-form {

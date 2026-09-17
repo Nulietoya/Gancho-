@@ -37,6 +37,11 @@ def test_explain_deviation_event_breaks_down_indicators(client):
     assert mood["streak_days"] == 3
     assert round(mood["baseline_mean"], 2) == 3.31
 
+    # respaldo científico (pedido do usuário): texto fixo por motor,
+    # nunca um número novo — ver app/services/psychoeducation.py
+    assert body["scientific_context"]
+    assert "sono" in body["scientific_context"].lower() or "medica" in body["scientific_context"].lower()
+
 
 def test_explain_deviation_event_not_found_is_404(client):
     headers = _register_and_login(client, OWNER_EMAIL, OWNER_PASSWORD)

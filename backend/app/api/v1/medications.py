@@ -143,13 +143,15 @@ def create_event(
     db: Session = Depends(get_db),
 ):
     try:
-        return medication_service.create_event(
+        event = medication_service.create_event(
             db, current_user, medication_id, schedule_id, payload.model_dump()
         )
     except MedicationNotFound:
         raise _medication_not_found()
     except ScheduleNotFound:
         raise _schedule_not_found()
+    tip = medication_service.adherence_tip_for_event(db, event)
+    return MedicationEventPublic.model_validate(event).model_copy(update={"adherence_tip": tip})
 
 
 @router.get("/{medication_id}/schedules/{schedule_id}/events", response_model=list[MedicationEventPublic])

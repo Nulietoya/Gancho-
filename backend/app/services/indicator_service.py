@@ -11,18 +11,21 @@ Chamado de dentro da mesma transação de quem gerou o dado
 commit próprio, é responsabilidade de quem chama.
 
 **Decisão de escopo registrada**: nem todo campo coletado tem um
-`IndicatorKey` correspondente ainda. De `DailyCheckIn`, só
-`mood`/`energy`/`anxiety`/`ability_to_start_tasks` mapeiam direto;
-`sleep_quality` (escala 1-5, não é a mesma coisa que `SLEEP_HOURS`),
-`willingness_to_interact` e `sense_of_functioning` ficam de fora por
-enquanto — forçar `willingness_to_interact` em `SOCIAL_CONTACT`, por
-exemplo, misturaria "vontade de interagir" (subjetivo) com "contato
-social" (comportamental/contável), o que o item 38 pede pra manter
-separado. `SLEEP_HOURS`, `WAKE_TIME_MINUTES`, `SLEEP_TIME_MINUTES`,
-`LEFT_HOME`, `SOCIAL_CONTACT`, `ACTIVITY_LEVEL` e `AVOIDANCE_LOAD`
-também ficam sem fonte de dado real ainda (dependem de rotina diária
-declarada dia a dia ou sensor passivo, nenhum dos dois existe no MVP)
-— o `FunctionalIndicator` sendo um fato normalizado por
+`IndicatorKey` correspondente ainda. De `DailyCheckIn`,
+`mood`/`energy`/`anxiety`/`ability_to_start_tasks`/`sleep_quality`
+mapeiam direto; `willingness_to_interact` e `sense_of_functioning`
+ficam de fora por enquanto — forçar `willingness_to_interact` em
+`SOCIAL_CONTACT`, por exemplo, misturaria "vontade de interagir"
+(subjetivo) com "contato social" (comportamental/contável), o que o
+item 38 pede pra manter separado. `sleep_quality` (escala subjetiva
+1-5) virou `IndicatorKey.SLEEP_QUALITY` — indicador PRÓPRIO, nunca
+misturado com `SLEEP_HOURS` (unidade e fonte diferentes: horas
+objetivas de uma rotina/sensor que ainda não existe no MVP, não uma
+percepção subjetiva de qualidade). `SLEEP_HOURS`, `WAKE_TIME_MINUTES`,
+`SLEEP_TIME_MINUTES`, `LEFT_HOME`, `SOCIAL_CONTACT`, `ACTIVITY_LEVEL`
+e `AVOIDANCE_LOAD` continuam sem fonte de dado real (dependem de
+rotina diária declarada dia a dia ou sensor passivo, nenhum dos dois
+existe no MVP) — o `FunctionalIndicator` sendo um fato normalizado por
 `(usuário, indicador, dia, fonte)` significa que adicionar a fonte
 depois é só escrever um novo `sync_*`, nunca reescrever o motor.
 """
@@ -43,6 +46,7 @@ _CHECKIN_FIELD_TO_INDICATOR = {
     "energy": IndicatorKey.ENERGY,
     "anxiety": IndicatorKey.ANXIETY,
     "ability_to_start_tasks": IndicatorKey.ABILITY_TO_START_TASKS,
+    "sleep_quality": IndicatorKey.SLEEP_QUALITY,
 }
 
 _TASK_EVENT_TYPE_TO_INDICATOR = {
