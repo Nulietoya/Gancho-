@@ -888,6 +888,90 @@ button:focus-visible,
   font-size: 1rem;
 }
 
+/* --- Home (redesign 2026-09) --------------------------------------------- */
+
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.home-section h2 {
+  margin-top: 0;
+  font-size: 1.05rem;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-option {
+  padding: 10px 16px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.chip-option:hover {
+  border-color: var(--color-primary);
+}
+
+.chip-option:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.chip-option--selected {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-contrast);
+  font-weight: 600;
+}
+
+.home-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--color-text-muted);
+}
+
+.home-stats p {
+  margin: 0;
+}
+
+.home-more summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: var(--spacing-1) 0;
+}
+
+.home-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.home-more summary::after {
+  content: " ▾";
+}
+
+.home-more[open] summary::after {
+  content: " ▴";
+}
+
+.home-more__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding-top: var(--spacing-1);
+}
+
 /* --- responsivo (telefone) --------------------------------------------- */
 
 @media (max-width: 480px) {

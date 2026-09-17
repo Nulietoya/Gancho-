@@ -22,6 +22,18 @@ export async function registerAccount(page: Page, email: string, password = TEST
 }
 
 /**
+ * Redesign da Home (2026-09) reduziu a navegação a 4 áreas — a maior
+ * parte das rotas (Check-in, Medicamentos, Alertas, Rotina, Rede de
+ * confiança, Observando, Plano pessoal, Notificações, Auditoria) mora
+ * dentro do menu nativo `<details>` "Mais" (`Layout.tsx`), que
+ * precisa ser aberto (clicado) antes de qualquer link lá dentro ficar
+ * visível/clicável — um `<details>` fechado não expõe seu conteúdo.
+ */
+export async function openMoreMenu(page: Page): Promise<void> {
+  await page.getByText("Mais", { exact: true }).click();
+}
+
+/**
  * O convite de pessoa de confiança (ETAPA 27, 2ª leva) nunca expõe o
  * `invite_token` de volta pra UI, e o cadastro v1 não manda e-mail
  * nenhum (decisão registrada desde a ETAPA 22) — em produção esse

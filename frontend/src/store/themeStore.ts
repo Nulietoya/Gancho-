@@ -1,13 +1,14 @@
 /**
- * Tema visual (claro "calmo" — padrão — ou escuro), escolhido pela
- * pessoa em Configurações. Guardado em localStorage (não é dado de
- * conta, não precisa ir pro backend) e aplicado via
- * `document.documentElement.dataset.theme`, que é o seletor que
- * `index.css` usa pra trocar as variáveis de cor (`--color-*`).
+ * Tema visual (escuro — padrão desde o redesign da Home, 2026-09 — ou
+ * claro "Companheiro calmo"), escolhido pela pessoa em Configurações.
+ * Guardado em localStorage (não é dado de conta, não precisa ir pro
+ * backend) e aplicado via `document.documentElement.dataset.theme`,
+ * que é o seletor que `index.css` usa pra trocar as variáveis de cor
+ * (`--color-*`).
  *
  * `index.html` tem um script inline que lê a mesma chave antes do
- * React montar, pra evitar o flash do tema claro em quem já escolheu
- * o escuro.
+ * React montar, pra evitar o flash do tema errado em quem já
+ * escolheu (ou nunca trocou, já que agora o padrão é escuro).
  */
 import { create } from "zustand";
 
@@ -25,9 +26,10 @@ function applyTheme(theme: Theme) {
 
 function readStoredTheme(): Theme {
   try {
-    return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    // só uma escolha explícita e salva de "light" tira do escuro padrão
+    return localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
   } catch {
-    return "light";
+    return "dark";
   }
 }
 

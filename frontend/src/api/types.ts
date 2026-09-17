@@ -50,6 +50,18 @@ export interface CheckInCreate {
   extra_answers?: Record<string, unknown> | null;
 }
 
+/** Espelha `CheckInUpdate` do backend — PATCH parcial, nenhum campo obrigatório. */
+export interface CheckInUpdate {
+  mood?: number | null;
+  energy?: number | null;
+  anxiety?: number | null;
+  ability_to_start_tasks?: number | null;
+  willingness_to_interact?: number | null;
+  sleep_quality?: number | null;
+  sense_of_functioning?: number | null;
+  extra_answers?: Record<string, unknown> | null;
+}
+
 export type MedicationEventStatus =
   | "taken"
   | "not_taken"

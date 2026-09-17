@@ -10,7 +10,7 @@ import { registerAccount, uniqueEmail } from "./helpers";
 test.describe("tarefas — ciclo de vida", () => {
   test("criar → iniciar → pausar → retomar → adiar com motivo → concluir", async ({ page }) => {
     await registerAccount(page, uniqueEmail("e2e_tasks"));
-    await page.getByRole("link", { name: "Tarefas" }).click();
+    await page.getByRole("link", { name: "Missões" }).click();
     await expect(page).toHaveURL(/\/tarefas$/);
 
     await page.getByLabel("Título").fill("Lavar louça");
@@ -44,7 +44,7 @@ test.describe("tarefas — ciclo de vida", () => {
 
   test("cancelar exige confirmação de dois passos", async ({ page }) => {
     await registerAccount(page, uniqueEmail("e2e_tasks_cancel"));
-    await page.getByRole("link", { name: "Tarefas" }).click();
+    await page.getByRole("link", { name: "Missões" }).click();
 
     await page.getByLabel("Título").fill("Tarefa a cancelar");
     await page.getByRole("button", { name: "Criar tarefa" }).click();

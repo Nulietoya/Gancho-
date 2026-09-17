@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { registerAccount, uniqueEmail } from "./helpers";
+import { openMoreMenu, registerAccount, uniqueEmail } from "./helpers";
 
 /**
  * Fluxo mais básico do produto, formalizado a partir do script ad hoc
@@ -27,6 +27,7 @@ test.describe("autenticação e check-in", () => {
     const email = uniqueEmail("e2e_checkin");
     await registerAccount(page, email);
 
+    await openMoreMenu(page);
     await page.getByRole("link", { name: "Check-in" }).click();
     await expect(page).toHaveURL(/\/checkin$/);
 
@@ -46,6 +47,7 @@ test.describe("autenticação e check-in", () => {
     const email = uniqueEmail("e2e_checkin_vazio");
     await registerAccount(page, email);
 
+    await openMoreMenu(page);
     await page.getByRole("link", { name: "Check-in" }).click();
     await page.getByRole("button", { name: "Salvar check-in" }).click();
 

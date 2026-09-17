@@ -6,17 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gancho</title>
     <script>
-      // Aplica o tema salvo ANTES do React montar, pra não piscar o
-      // tema claro por uma fração de segundo em quem escolheu escuro.
-      // Mesma chave que `src/store/themeStore.ts` lê/escreve.
+      // Aplica o tema ANTES do React montar, pra não piscar o tema
+      // errado por uma fração de segundo. Padrão é escuro desde o
+      // redesign da Home (2026-09) — só uma escolha explícita e salva
+      // de "light" tira do escuro. Mesma chave que
+      // `src/store/themeStore.ts` lê/escreve.
       (function () {
         try {
           var theme = localStorage.getItem("gancho_theme");
-          if (theme === "dark") {
+          if (theme !== "light") {
             document.documentElement.dataset.theme = "dark";
           }
         } catch (e) {
-          // localStorage indisponível (modo privado, etc.) — fica no tema claro padrão.
+          // localStorage indisponível (modo privado, etc.) — fica no tema escuro padrão.
         }
       })();
     </script>

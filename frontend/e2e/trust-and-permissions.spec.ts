@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fetchInviteTokenFromDb, registerAccount, uniqueEmail } from "./helpers";
+import { fetchInviteTokenFromDb, openMoreMenu, registerAccount, uniqueEmail } from "./helpers";
 
 /**
  * Formaliza os scripts ad hoc das levas 2ª e 6ª da ETAPA 27: convite
@@ -17,10 +17,14 @@ test.describe("rede de confiança — convite e permissões granulares", () => {
     const ownerPage = await ownerContext.newPage();
     await registerAccount(ownerPage, ownerEmail);
 
+    await openMoreMenu(ownerPage);
     await ownerPage.getByRole("link", { name: "Rede de confiança" }).click();
     await ownerPage.getByLabel("E-mail da pessoa").fill(trustedEmail);
     await ownerPage.getByRole("button", { name: "Enviar convite" }).click();
-    await expect(ownerPage.getByText(trustedEmail)).toBeVisible();
+    // o e-mail aparece de propósito em mais de um lugar da tela depois do
+    // convite (banner de confirmação, cabeçalho do card, aviso de convite
+    // pendente) — .first() basta, o objetivo aqui é só confirmar que apareceu.
+    await expect(ownerPage.getByText(trustedEmail).first()).toBeVisible();
 
     const inviteToken = fetchInviteTokenFromDb(trustedEmail);
 
@@ -43,7 +47,7 @@ test.describe("rede de confiança — convite e permissões granulares", () => {
     // recarrega pra pegar o status "accepted" que só existe desde que
     // a pessoa de confiança aceitou o convite, depois desse fetch.
     await ownerPage.reload();
-    await expect(ownerPage.getByText(trustedEmail)).toBeVisible();
+    await expect(ownerPage.getByText(trustedEmail).first()).toBeVisible();
 
     // dono concede só "Registrar observações sobre você"
     await ownerPage.getByRole("button", { name: "Gerenciar permissões" }).click();
