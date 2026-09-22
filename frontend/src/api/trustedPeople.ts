@@ -3,6 +3,7 @@ import { apiJson } from "./apiFetch";
 import type {
   InterventionPublic,
   InviteCreatedResponse,
+  InvitePreview,
   ObservationCreate,
   ObservationPublic,
   OwnerRelationshipPublic,
@@ -26,8 +27,19 @@ export function inviteTrustedPerson(email: string, relationshipLabel: string | n
   });
 }
 
-export function acceptInvite(inviteToken: string): Promise<RelationshipPublic> {
-  return apiJson<RelationshipPublic>("/trusted-people/accept", {
+/**
+ * Única chamada deste módulo que funciona sem estar logado — de
+ * propósito, pra tela de aceite mostrar "convite de <dono> para
+ * <e-mail>" ANTES de pedir login (`apiJson` só manda `Authorization`
+ * quando já existe token; sem token, chama do mesmo jeito). Erro
+ * (token inexistente, 404) é tratado por quem chama, não aqui.
+ */
+export function previewInvite(inviteToken: string): Promise<InvitePreview> {
+  return apiJson<InvitePreview>(`/trusted-people/invite-preview/${encodeURIComponent(inviteToken)}`);
+}
+
+export function acceptInvite(inviteToken: string): Promise<RelationshipAsTrustedPublic> {
+  return apiJson<RelationshipAsTrustedPublic>("/trusted-people/accept", {
     method: "POST",
     body: JSON.stringify({ invite_token: inviteToken }),
   });

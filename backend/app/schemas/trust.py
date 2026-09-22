@@ -92,6 +92,27 @@ class RelationshipAsTrustedPublic(RelationshipPublic):
     owner_display_name: str
 
 
+class InvitePreview(BaseModel):
+    """
+    Resposta de `GET /trusted-people/invite-preview/{token}` — a ÚNICA
+    rota deste módulo que não exige login. Bug real encontrado em
+    produção (ver docs/decisions.md): a pessoa convidada só descobria
+    que o convite era pra outro e-mail depois de tentar aceitar (erro
+    genérico 400) — muitas vezes já logada numa conta pessoal diferente
+    da que o dono digitou, sem forma de saber isso antes de tentar.
+    Esta rota deixa a página de aceite mostrar "convite de <dono> para
+    <invite_email>" ANTES de pedir login, então quem abre o link já
+    sabe com qual conta entrar (ou criar) antes de gastar uma tentativa.
+    Não é vazamento: quem já tem o token (imprevisível, só sai da tela
+    do dono ou do e-mail) já tinha acesso a este mesmo e-mail — esta
+    rota só evita que a pessoa convidada descubra isso do jeito difícil.
+    """
+
+    invite_email: EmailStr
+    owner_display_name: str
+    status: RelationshipStatus
+
+
 class PermissionUpdate(BaseModel):
     permission_key: PermissionKey
     is_granted: bool

@@ -6,6 +6,101 @@ nova vai no topo.
 
 ---
 
+## 2026-09-17 — Convite de pessoa de confiança não funcionava na prática (bug real de produção)
+
+### Pedido original
+
+"vamos verificar e entender pq o convite não funciona, outra pessoa
+não pode me acompanhar e me ajudar no monitoramento" — pedindo
+também pra confirmar que a visão da pessoa de confiança aparece
+distinta da rotina/vida do próprio dono (não é o mesmo painel).
+
+### Investigação (logs reais de produção, não suposição)
+
+Puxei os logs HTTP do backend em produção (Railway) do dia: um
+`POST /trusted-people/invite` (201, convite criado com sucesso), e
+depois **três tentativas seguidas de `POST /trusted-people/accept`
+com 400** de uma segunda sessão/navegador, intercaladas com tentativas
+de login falhas (401). Isso confirmou que o convite estava sendo
+criado, mas a pessoa convidada nunca conseguia aceitar — reproduzindo
+exatamente a queixa do usuário, não um caso hipotético.
+
+Lendo o código com essa pista, achei dois bugs reais e distintos:
+
+1. **`/aceitar-convite` ficava dentro do `ProtectedRoute`.** Quem
+   abrisse o link do convite sem já estar logado nesta conta (o caso
+   mais comum — a maioria das pessoas de confiança convidadas ainda
+   não tem conta no Gancho) era redirecionada pra `/entrar` e o
+   `?token=` da URL se perdia pra sempre, sem nenhuma forma de
+   recuperar o link depois de criar a conta ou entrar. `LoginPage` e
+   `RegisterPage` também sempre mandavam pra `/` no sucesso, sem
+   nenhum jeito de "voltar pra onde eu estava".
+2. **Tela de sucesso mostrava o e-mail errado.** `AcceptInvitePage`
+   exibia `accepted.invite_email` como se fosse a identidade do
+   dono ("você agora é pessoa de confiança de X") — mas
+   `invite_email` é o e-mail de QUEM ACEITA (a própria pessoa de
+   confiança), não do dono. A resposta do `POST /accept` (schema
+   `RelationshipPublic`) nunca trouxe a identidade do dono.
+
+Combinado, isso explica os 3×400 reais: a pessoa convidada
+provavelmente já tinha (ou criou) uma conta com um e-mail diferente
+do que o dono digitou ao convidar, sem nenhuma pista de qual era o
+e-mail esperado — o erro genérico "convite inválido, já usado ou
+endereçado a outro e-mail" não distinguia os três casos, e não havia
+como saber ANTES de tentar.
+
+### O que foi implementado
+
+- Nova rota pública (sem login), `GET /trusted-people/invite-preview/{token}`
+  (schema `InvitePreview`): mostra `invite_email` e o nome/e-mail do
+  dono ANTES de exigir sessão — a tela de aceite agora mostra
+  "Convite de `<dono>` para `<e-mail>`" pra quem abrir o link, logado
+  ou não. Não é vazamento: quem já tem o token (imprevisível, só saído
+  da tela do dono ou do e-mail) já tinha acesso a esse mesmo e-mail.
+- `POST /trusted-people/accept` passou a devolver
+  `RelationshipAsTrustedPublic` (com `owner_display_name` de
+  verdade), corrigindo a tela de sucesso.
+- `/aceitar-convite` saiu do `ProtectedRoute` (rota pública, ao lado
+  de `/entrar`/`/criar-conta` em `App.tsx`) — a própria página decide
+  o que mostrar: sem sessão, oferece Entrar/Criar conta preservando o
+  link exato de volta (`?redirect=`) e pré-preenchendo o e-mail
+  esperado; logado com e-mail diferente do convite, avisa isso
+  explicitamente ANTES de deixar tentar, com botão de Sair; logado
+  com o e-mail certo, segue o fluxo normal.
+- `LoginPage`/`RegisterPage` ganharam suporte a `?redirect=` (com
+  trava contra redirect pra fora do app, tipo `//evil.com`) e a
+  `?email=` pra pré-preencher.
+
+### Verificação
+
+- 239 testes de backend (229 anteriores + 10 novos: preview sem
+  login, preview 404 pra token inexistente, accept devolve a
+  identidade do dono).
+- 47 testes de frontend (42 anteriores + 5 novos: preview e aviso de
+  e-mail incompatível na tela de aceite; `LoginPage` volta pro
+  `?redirect=` e trava redirect externo).
+- `tsc`, `oxlint` e `vite build` limpos.
+- **Testado de ponta a ponta contra o backend real rodando
+  localmente, simulando o cenário exato do bug** (não só teste
+  automatizado): criei um convite de verdade via API, abri o link
+  num navegador sem sessão nenhuma (Playwright) → tela mostrou
+  "Convite de owner-e2e@example.com para amiga-e2e@example.com" →
+  cliquei "Criar conta" e registrei de propósito com um e-mail
+  DIFERENTE do convidado → voltou pra tela de convite mostrando o
+  aviso de descompasso, sem deixar tentar aceitar → saí, criei conta
+  de novo agora com o e-mail certo → aceitei → tela de sucesso
+  mostrou a identidade do DONO, não o próprio e-mail. Também
+  confirmei visualmente (screenshot) que o painel do dono (`/`, com
+  Check-in/Tarefas/Medicamentos) e o painel da pessoa de confiança
+  (`/observando/:id`, com "Estado"/"Registrar observação", sem nada
+  de edição da rotina do dono) são telas completamente diferentes.
+- Ainda não verificado: o envio real do e-mail de convite em si (se
+  o `RESEND_API_KEY` de produção está usando um domínio verificado ou
+  ainda o domínio de teste do Resend, que só entrega pro e-mail da
+  própria conta Resend — ver `app/core/email.py`). Isso não bloqueia
+  o convite (o link continua disponível pra copiar na tela do dono
+  mesmo se o e-mail falhar), mas vale confirmar separadamente.
+
 ## 2026-09-17 — ETAPA 37: 4 features pedidas pelo usuário (pós-pesquisa de evidência científica sobre TDAH)
 
 ### Contexto

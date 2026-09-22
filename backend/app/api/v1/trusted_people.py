@@ -22,6 +22,7 @@ from app.schemas.task import SuggestTaskRequest, TaskPublic
 from app.schemas.trust import (
     AcceptInviteRequest,
     InviteCreatedResponse,
+    InvitePreview,
     InviteRequest,
     ObservationCreate,
     ObservationPublic,
@@ -44,16 +45,40 @@ def invite(
     return trust_service.invite_trusted_person(db, current_user, payload.email, payload.relationship_label)
 
 
-@router.post("/accept", response_model=RelationshipPublic)
+@router.get("/invite-preview/{token}", response_model=InvitePreview)
+def preview_invite(token: str, db: Session = Depends(get_db)):
+    """
+    Única rota deste módulo sem `Depends(get_current_user)` — de
+    propósito: quem abre um link de convite ainda não está logado
+    nesta conta. Deixa a tela de aceite mostrar "convite de <dono>
+    para <invite_email>" antes de pedir login, pra quem for aceitar já
+    saber com qual e-mail entrar ou criar conta (ver `InvitePreview`).
+    """
+    try:
+        relationship = trust_service.get_relationship_by_token(db, token)
+    except InvalidInviteToken:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="convite não encontrado")
+    return InvitePreview(
+        invite_email=relationship.invite_email,
+        owner_display_name=trust_service.get_owner_display_name(db, relationship.owner_user_id),
+        status=relationship.status,
+    )
+
+
+@router.post("/accept", response_model=RelationshipAsTrustedPublic)
 def accept(
     payload: AcceptInviteRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:
-        return trust_service.accept_invite(db, current_user, payload.invite_token)
+        relationship = trust_service.accept_invite(db, current_user, payload.invite_token)
     except InvalidInviteToken:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="convite inválido, já usado ou endereçado a outro e-mail")
+    return RelationshipAsTrustedPublic(
+        **RelationshipPublic.model_validate(relationship).model_dump(),
+        owner_display_name=trust_service.get_owner_display_name(db, relationship.owner_user_id),
+    )
 
 
 @router.get("", response_model=list[OwnerRelationshipPublic])
