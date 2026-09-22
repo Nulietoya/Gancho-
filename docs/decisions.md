@@ -6,6 +6,96 @@ nova vai no topo.
 
 ---
 
+## 2026-09-22 — Exclusão de conta: decisão de soft-delete-só revertida para apagamento físico real; convite passa a contar só com o link (sem depender de e-mail)
+
+### Pedido original
+
+"vamos fazer as pendências, esqueça o resend, pode ser convidado
+apenas pelo link e seguimos para o endpoint" — retomando dois itens
+deixados em aberto: (1) domínio do Resend ainda não verificado
+(e-mail de convite não confiável), (2) falta de um jeito real de
+apagar contas de teste acumuladas em QA.
+
+### Convite só por link — nada mudou no código
+
+Investigando antes de mexer: `TrustedPeoplePage.tsx` já tinha desde a
+correção de 2026-09-17 um fluxo completo de "copiar link" (`CopyInviteLink`),
+mostrado tanto logo após criar o convite quanto depois, enquanto ele
+continuar pendente — e o backend já tenta enviar e-mail de forma
+totalmente best-effort (`app/core/email.py`: sem `RESEND_API_KEY`
+nem `SMTP_HOST` configurados, cai num log e nunca lança erro pro
+código que chama). Ou seja: já funcionava 100% só por link, sem
+depender do Resend. Única mudança foi de texto — o aviso ao lado do
+link parava de soar como "e-mail é o caminho principal, link é
+plano B" e passou a apresentar o link como a forma garantida.
+
+### Exclusão de conta — decisão anterior revertida
+
+Achei, ao investigar, que já existia uma decisão registrada (ETAPA 25,
+`account_service.py`): exclusão era sempre soft delete
+(`User.is_active`/`deactivated_at`), com apagamento físico
+deliberadamente adiado pra um job de expurgo futuro, sem prazo de
+retenção ainda definido. Isso contradizia o pedido atual — sinalizei
+a contradição antes de mexer (nunca resolver isso em silêncio) e o
+usuário escolheu reverter: apagamento físico de verdade, agora,
+tanto pra conta real (mais correto numa app de saúde mental — dado
+de humor, medicação, observação de terceiro) quanto pra resolver o
+problema prático de QA (soft delete não libera `users.email`, que é
+`unique`, pra reuso).
+
+**O que `delete_account` faz:** reconfirma senha (mesmo critério de
+`change_password`), apaga a linha de `users` de verdade
+(`db.delete(user)`). Todo dado próprio cai em cascata pelo schema
+(`ondelete="CASCADE"` já declarado em cada FK pra `users.id` desde a
+migration inicial — tarefa, check-in, medicação, rotina, plano
+pessoal, baseline, desvio, intervenção, notificação, sessão/token,
+relacionamento em que a conta é a DONA). Duas exceções tratadas à
+mão, porque o cascade puro deixaria estado errado:
+
+- **`AuditLog`** (`actor_user_id`/`target_user_id`, `ondelete="SET NULL"`):
+  o log da própria exclusão (`AuditAction.ACCOUNT_DELETED`, novo
+  valor no enum nativo `auditaction` via migration `c1a4e9f2b3d6`,
+  mesmo padrão de `ALTER TYPE ... ADD VALUE` já usado em `8a3f2c9b1e07`)
+  é gravado ANTES do delete, na mesma transação — sobrevive
+  anonimizado, porque apagar o rastro junto pioraria a garantia que
+  auditoria existe pra dar.
+- **Conta que é PESSOA DE CONFIANÇA (não dona) de outro relacionamento**
+  (`trusted_user_id`, `ondelete="SET NULL"`): sem tratamento manual, a
+  linha sobreviveria com `trusted_user_id` nulo mas `status` ainda
+  "accepted" — uma pessoa de confiança fantasma que o dono continuaria
+  vendo como ativa. `delete_account` revoga esses relacionamentos
+  explicitamente (mesmo efeito de `revoke_relationship`) antes de
+  apagar a conta — verificado visualmente no navegador: o dono passa
+  a ver "Revogado" no lugar de "Aceito".
+
+Endpoint mudou de `POST /account/deactivate` pra `POST /account/delete`
+(resposta `{"deleted": true}`, sem mais `deactivated_at`). Campos
+`User.is_active`/`deactivated_at` continuam no modelo, sem uso por
+este fluxo — reservados pra uma eventual suspensão administrativa
+futura, que é conceito diferente de exclusão.
+
+**UI**: a tela de configurações ganhou uma segunda barreira além da
+senha — digitar "EXCLUIR" pra habilitar o botão final — proporcional
+ao fato de não existir mais "desfazer depois" (antes era só
+desativação, reversível em espírito mesmo que a UI não oferecesse
+reativação).
+
+### Verificação
+
+242 testes de backend (6 novos: senha errada, e-mail liberado pro
+reuso, cascade de dado próprio, log de auditoria sobrevivendo
+anonimizado, relacionamento revogado quando quem apaga é a pessoa de
+confiança, relacionamento apagado em cascata quando quem apaga é a
+dona). 50 de frontend (3 novos, cobrindo o botão travado até digitar
+a palavra de confirmação). tsc/oxlint/build limpos. Verificado de
+ponta a ponta num navegador real contra o backend local: registro →
+exclusão pela UI → redirecionado pra `/entrar` → login com a mesma
+senha rejeitado → registro de novo com o mesmo e-mail aceito; e,
+separadamente, o cenário da pessoa de confiança que se apaga,
+confirmando visualmente que o dono passa a ver "Revogado".
+
+---
+
 ## 2026-09-17 — Convite de pessoa de confiança não funcionava na prática (bug real de produção)
 
 ### Pedido original

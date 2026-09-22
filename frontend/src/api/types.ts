@@ -579,13 +579,12 @@ export interface ChangePasswordRequest {
   new_password: string;
 }
 
-export interface AccountDeactivateRequest {
+export interface AccountDeleteRequest {
   password: string;
 }
 
-export interface AccountDeactivateResponse {
-  deactivated: boolean;
-  deactivated_at: string;
+export interface AccountDeleteResponse {
+  deleted: boolean;
 }
 
 // --- ETAPA 27 (7ª leva): visualizador de auditoria ---

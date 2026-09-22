@@ -1,12 +1,12 @@
 import { apiJson } from "./apiFetch";
-import type { AccountDeactivateRequest, AccountDeactivateResponse, ChangePasswordRequest } from "./types";
+import type { AccountDeleteRequest, AccountDeleteResponse, ChangePasswordRequest } from "./types";
 
 export function changePassword(data: ChangePasswordRequest): Promise<void> {
   return apiJson<void>("/auth/change-password", { method: "POST", body: JSON.stringify(data) });
 }
 
-export function deactivateAccount(data: AccountDeactivateRequest): Promise<AccountDeactivateResponse> {
-  return apiJson<AccountDeactivateResponse>("/account/deactivate", { method: "POST", body: JSON.stringify(data) });
+export function deleteAccount(data: AccountDeleteRequest): Promise<AccountDeleteResponse> {
+  return apiJson<AccountDeleteResponse>("/account/delete", { method: "POST", body: JSON.stringify(data) });
 }
 
 /**

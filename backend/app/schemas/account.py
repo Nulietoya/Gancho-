@@ -2,5 +2,5 @@
 from pydantic import BaseModel, Field
 
 
-class AccountDeactivateRequest(BaseModel):
+class AccountDeleteRequest(BaseModel):
     password: str = Field(min_length=1)

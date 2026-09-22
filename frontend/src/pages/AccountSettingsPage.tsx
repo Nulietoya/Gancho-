@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { changePassword, deactivateAccount, exportAndDownloadAccountData } from "../api/account";
+import { changePassword, deleteAccount, exportAndDownloadAccountData } from "../api/account";
 import { describeError } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { useThemeStore } from "../store/themeStore";
@@ -144,11 +144,14 @@ function ExportDataSection() {
   );
 }
 
-function DeactivateAccountSection() {
+const DELETE_CONFIRMATION_WORD = "EXCLUIR";
+
+function DeleteAccountSection() {
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState("");
+  const [confirmationText, setConfirmationText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -157,29 +160,30 @@ function DeactivateAccountSection() {
     setError(null);
     setSubmitting(true);
     try {
-      await deactivateAccount({ password });
-      // o backend já revoga toda sessão nesse momento — o logout local
-      // só limpa o estado (a chamada a /auth/logout dentro dele é
-      // best-effort e tolera o refresh token já estar morto).
+      await deleteAccount({ password });
+      // a conta já não existe mais no banco — o logout local só limpa
+      // o estado local (a chamada a /auth/logout dentro dele é
+      // best-effort e tolera o refresh token já não existir mais).
       await logout();
       navigate("/entrar", { replace: true });
     } catch (err) {
-      setError(describeError(err, "não foi possível desativar a conta"));
+      setError(describeError(err, "não foi possível excluir a conta"));
       setSubmitting(false);
     }
   }
 
   return (
     <section className="card">
-      <h2>Desativar conta</h2>
+      <h2>Excluir conta</h2>
       <p className="checkin-hint">
-        Sua conta para de funcionar na hora — login e sessões atuais param de valer. Os dados não são apagados na
-        hora (exclusão física segue um prazo de retenção ainda não definido), mas você não consegue mais acessá-los
-        por aqui.
+        Apaga sua conta e todo o dado ligado a ela — tarefas, check-ins, medicações, rotina, plano pessoal,
+        notificações — de forma definitiva e imediata. Não é desativação: não tem como desfazer depois.
+        Relacionamentos de confiança em que você é a pessoa dona somem junto; se você é pessoa de confiança de
+        alguém, esse acesso é revogado, mas a conta da outra pessoa continua intacta.
       </p>
       {!confirming && (
         <button type="button" className="button button--danger" onClick={() => setConfirming(true)}>
-          Desativar minha conta
+          Excluir minha conta
         </button>
       )}
       {confirming && (
@@ -194,14 +198,28 @@ function DeactivateAccountSection() {
               autoComplete="current-password"
             />
           </label>
+          <label>
+            Digite <strong>{DELETE_CONFIRMATION_WORD}</strong> para confirmar
+            <input
+              type="text"
+              value={confirmationText}
+              onChange={(e) => setConfirmationText(e.target.value)}
+              required
+              autoComplete="off"
+            />
+          </label>
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
           <div className="relationship-card__revoke">
-            <button type="submit" className="button button--danger" disabled={submitting}>
-              {submitting ? "Desativando…" : "Sim, desativar minha conta"}
+            <button
+              type="submit"
+              className="button button--danger"
+              disabled={submitting || confirmationText !== DELETE_CONFIRMATION_WORD}
+            >
+              {submitting ? "Excluindo…" : "Sim, excluir minha conta para sempre"}
             </button>
             <button
               type="button"
@@ -209,6 +227,7 @@ function DeactivateAccountSection() {
               onClick={() => {
                 setConfirming(false);
                 setPassword("");
+                setConfirmationText("");
                 setError(null);
               }}
             >
@@ -228,7 +247,7 @@ export function AccountSettingsPage() {
       <AppearanceSection />
       <ChangePasswordSection />
       <ExportDataSection />
-      <DeactivateAccountSection />
+      <DeleteAccountSection />
     </div>
   );
 }

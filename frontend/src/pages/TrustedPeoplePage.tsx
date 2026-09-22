@@ -117,10 +117,9 @@ function InviteForm({ onInvited }: { onInvited: (relationship: OwnerRelationship
       </form>
       {lastInvite && (
         <div className="checkin-hint invite-fallback">
-          Convite criado para <strong>{lastInvite.email}</strong>. Um e-mail foi enviado, mas não há garantia de
-          entrega (ex.: provedor de e-mail fora do ar) — se a pessoa não receber, mande este link direto por
-          qualquer outro canal (WhatsApp, SMS, etc.). Se sair desta tela, dá pra achar o mesmo link de novo na lista
-          abaixo, enquanto o convite continuar pendente.
+          Convite criado para <strong>{lastInvite.email}</strong>. Copie o link abaixo e mande direto pra pessoa,
+          por qualquer canal (WhatsApp, SMS, etc.) — é a forma garantida de chegar até ela. Se sair desta tela, dá
+          pra achar o mesmo link de novo na lista abaixo, enquanto o convite continuar pendente.
           <CopyInviteLink token={lastInvite.token} />
         </div>
       )}

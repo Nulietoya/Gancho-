@@ -282,3 +282,4 @@ class AuditAction(str, enum.Enum):
     DATA_EXPORTED = "data_exported"
     ACCOUNT_DELETION_REQUESTED = "account_deletion_requested"
     SUSPECTED_SESSION_THEFT = "suspected_session_theft"
+    ACCOUNT_DELETED = "account_deleted"
