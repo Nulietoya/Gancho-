@@ -1,36 +1,29 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { describeError } from "../api/client";
-import { FocusTimer } from "../components/FocusTimer";
-import {
-  cancelTask,
-  completeTask,
-  createTask,
-  listTasks,
-  pauseTask,
-  postponeTask,
-  resumeTask,
-  startTask,
-} from "../api/tasks";
+import { createTask, listTasks } from "../api/tasks";
 import { listTrustedPeople } from "../api/trustedPeople";
-import type { TaskFailureReasonType, TaskPriority, TaskPublic } from "../api/types";
-import {
-  TASK_FAILURE_REASON_LABELS,
-  TASK_FAILURE_REASON_ORDER,
-  TASK_PRIORITY_LABELS,
-  TASK_PRIORITY_ORDER,
-  TASK_STATUS_BADGE_VARIANT,
-  TASK_STATUS_LABELS,
-} from "../labels";
+import type { TaskPriority, TaskPublic } from "../api/types";
+import { FocusTimer } from "../components/FocusTimer";
+import { QuickAddTasks } from "../components/QuickAddTasks";
+import { TaskCard } from "../components/TaskCard";
+import { TASK_PRIORITY_LABELS, TASK_PRIORITY_ORDER } from "../labels";
+import { groupTasks } from "../taskOrdering";
 
-function formatDate(iso: string | null): string | null {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString("pt-BR");
-}
+// Mantido exportado daqui porque outras telas (Home) e testes já importavam deste arquivo.
+export { TaskCard };
 
+const MINUTE_OPTIONS = [5, 15, 30, 60];
+
+/**
+ * Escrever a própria missão continua possível, mas é o caminho
+ * secundário: só o título é obrigatório; tempo/prioridade/prazo são
+ * chips opcionais escondidos em "mais detalhes".
+ */
 function CreateTaskForm({ onCreated }: { onCreated: (task: TaskPublic) => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [minutes, setMinutes] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -44,12 +37,14 @@ function CreateTaskForm({ onCreated }: { onCreated: (task: TaskPublic) => void }
         title: title.trim(),
         description: description.trim() || null,
         priority,
+        estimated_minutes: minutes,
         due_date: dueDate || null,
       });
       onCreated(task);
       setTitle("");
       setDescription("");
       setDueDate("");
+      setMinutes(null);
       setPriority("medium");
     } catch (err) {
       setError(describeError(err, "não foi possível criar a tarefa"));
@@ -60,26 +55,59 @@ function CreateTaskForm({ onCreated }: { onCreated: (task: TaskPublic) => void }
 
   return (
     <section className="card">
-      <h2>Nova tarefa</h2>
       <form className="invite-form" onSubmit={handleSubmit}>
         <label>
           Título
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} />
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            maxLength={200}
+            placeholder="ex.: responder o e-mail da faculdade"
+          />
         </label>
         <label>
-          Descrição (opcional)
-          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} />
+          Primeiro passo (opcional)
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="a menor ação possível pra começar"
+          />
         </label>
-        <label>
-          Prioridade
-          <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}>
-            {TASK_PRIORITY_ORDER.map((p) => (
-              <option key={p} value={p}>
-                {TASK_PRIORITY_LABELS[p]}
-              </option>
+        <div className="chip-field">
+          <span>Quanto tempo mais ou menos?</span>
+          <div className="chip-row" role="group" aria-label="Tempo estimado">
+            {MINUTE_OPTIONS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`chip-option${minutes === m ? " chip-option--selected" : ""}`}
+                aria-pressed={minutes === m}
+                onClick={() => setMinutes(minutes === m ? null : m)}
+              >
+                {m < 60 ? `${m} min` : "1 h+"}
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
+        <div className="chip-field">
+          <span>Prioridade</span>
+          <div className="chip-row" role="group" aria-label="Prioridade">
+            {TASK_PRIORITY_ORDER.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`chip-option${priority === p ? " chip-option--selected" : ""}`}
+                aria-pressed={priority === p}
+                onClick={() => setPriority(p)}
+              >
+                {TASK_PRIORITY_LABELS[p]}
+              </button>
+            ))}
+          </div>
+        </div>
         <label>
           Prazo (opcional)
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
@@ -94,184 +122,6 @@ function CreateTaskForm({ onCreated }: { onCreated: (task: TaskPublic) => void }
         </button>
       </form>
     </section>
-  );
-}
-
-function PostponeForm({
-  onSubmit,
-  onCancel,
-}: {
-  onSubmit: (reason: TaskFailureReasonType, customText: string) => Promise<boolean>;
-  onCancel: () => void;
-}) {
-  const [reason, setReason] = useState<TaskFailureReasonType>(TASK_FAILURE_REASON_ORDER[0]);
-  const [customText, setCustomText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const saved = await onSubmit(reason, customText.trim());
-      if (!saved) setSubmitting(false);
-    } catch (err) {
-      setError(describeError(err, "não foi possível adiar"));
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form className="invite-form" onSubmit={handleSubmit}>
-      <label>
-        Por que adiar
-        <select value={reason} onChange={(e) => setReason(e.target.value as TaskFailureReasonType)}>
-          {TASK_FAILURE_REASON_ORDER.map((r) => (
-            <option key={r} value={r}>
-              {TASK_FAILURE_REASON_LABELS[r]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Detalhe (opcional)
-        <input type="text" value={customText} onChange={(e) => setCustomText(e.target.value)} maxLength={500} />
-      </label>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="relationship-card__actions">
-        <button type="submit" className="button button--ghost" disabled={submitting}>
-          {submitting ? "Adiando…" : "Confirmar adiamento"}
-        </button>
-        <button type="button" className="button button--ghost" onClick={onCancel}>
-          Cancelar
-        </button>
-      </div>
-    </form>
-  );
-}
-
-export function TaskCard({
-  task,
-  relationshipLabel,
-  onChanged,
-}: {
-  task: TaskPublic;
-  relationshipLabel: string | null;
-  onChanged: (task: TaskPublic) => void;
-}) {
-  const [error, setError] = useState<string | null>(null);
-  const [acting, setActing] = useState(false);
-  const [showPostpone, setShowPostpone] = useState(false);
-  const [confirmingCancel, setConfirmingCancel] = useState(false);
-
-  async function run(action: () => Promise<TaskPublic>): Promise<boolean> {
-    setActing(true);
-    setError(null);
-    try {
-      onChanged(await action());
-      return true;
-    } catch (err) {
-      setError(describeError(err, "não foi possível atualizar a tarefa"));
-      return false;
-    } finally {
-      setActing(false);
-    }
-  }
-
-  const isTerminal = task.status === "completed" || task.status === "cancelled";
-
-  return (
-    <li className="card relationship-card">
-      <div className="relationship-card__header">
-        <div>
-          <strong>{task.title}</strong>
-          {task.description && <p className="relationship-card__email">{task.description}</p>}
-        </div>
-        <span className={`status-badge status-badge--${TASK_STATUS_BADGE_VARIANT[task.status]}`}>
-          {TASK_STATUS_LABELS[task.status]}
-        </span>
-      </div>
-
-      <p className="relationship-card__dates">
-        prioridade {TASK_PRIORITY_LABELS[task.priority]}
-        {task.due_date && ` — prazo ${formatDate(task.due_date)}`}
-        {task.postponed_count > 0 && ` — adiada ${task.postponed_count}x`}
-      </p>
-
-      {task.origin === "trusted_person_suggestion" && (
-        <p className="checkin-hint">sugerida por {relationshipLabel ?? "uma pessoa de confiança"}</p>
-      )}
-
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-
-      {!isTerminal && !showPostpone && (
-        <div className="relationship-card__actions">
-          {(task.status === "pending" || task.status === "postponed") && (
-            <button type="button" className="button button--ghost" onClick={() => void run(() => startTask(task.id))} disabled={acting}>
-              Iniciar
-            </button>
-          )}
-          {task.status === "paused" && (
-            <button type="button" className="button button--ghost" onClick={() => void run(() => resumeTask(task.id))} disabled={acting}>
-              Retomar
-            </button>
-          )}
-          {task.status === "started" && (
-            <button type="button" className="button button--ghost" onClick={() => void run(() => pauseTask(task.id))} disabled={acting}>
-              Pausar
-            </button>
-          )}
-          <button type="button" className="button button--ghost" onClick={() => setShowPostpone(true)} disabled={acting}>
-            Adiar
-          </button>
-          <button type="button" className="button button--ghost" onClick={() => void run(() => completeTask(task.id))} disabled={acting}>
-            Concluir
-          </button>
-          {!confirmingCancel && (
-            <button type="button" className="button button--ghost" onClick={() => setConfirmingCancel(true)} disabled={acting}>
-              Cancelar tarefa
-            </button>
-          )}
-        </div>
-      )}
-
-      {showPostpone && (
-        <PostponeForm
-          onCancel={() => setShowPostpone(false)}
-          onSubmit={async (reason, customText) => {
-            const saved = await run(() => postponeTask(task.id, { reason, custom_text: customText || null }));
-            if (saved) setShowPostpone(false);
-            return saved;
-          }}
-        />
-      )}
-
-      {confirmingCancel && (
-        <div className="relationship-card__revoke">
-          <span>Cancelar esta tarefa?</span>
-          <button
-            type="button"
-            className="button button--danger"
-            onClick={() => void run(() => cancelTask(task.id))}
-            disabled={acting}
-          >
-            {acting ? "Cancelando…" : "Sim, cancelar"}
-          </button>
-          <button type="button" className="button button--ghost" onClick={() => setConfirmingCancel(false)}>
-            Voltar
-          </button>
-        </div>
-      )}
-    </li>
   );
 }
 
@@ -308,17 +158,44 @@ export function TasksPage() {
     setTasks((prev) => [task, ...(prev ?? [])]);
   }
 
+  const groups = groupTasks(tasks ?? []);
+  const doneToday = groups.doneToday.length;
+  const totalToday = doneToday + groups.now.length + groups.queue.length;
+
+  function renderList(list: TaskPublic[], compactAfterFirst = false) {
+    return (
+      <ul className="relationship-list">
+        {list.map((task, index) => (
+          <TaskCard
+            key={task.id}
+            compact={compactAfterFirst && (index > 0 || groups.now.length > 0)}
+            task={task}
+            relationshipLabel={task.source_relationship_id ? relationshipLabels[task.source_relationship_id] ?? null : null}
+            onChanged={handleChanged}
+          />
+        ))}
+      </ul>
+    );
+  }
+
+  const quickAdd = <QuickAddTasks tasks={tasks} onCreated={handleCreated} />;
+  const isEmpty = tasks !== null && groups.now.length === 0 && groups.queue.length === 0;
+
   return (
-    <div className="trusted-people-page">
-      <h1>Tarefas</h1>
-      <p className="checkin-hint">
-        Inclui tarefas que você criou e as sugeridas por alguém da sua rede de confiança — sugestão nunca começa
-        automaticamente, fica pendente até você decidir o que fazer com ela.
-      </p>
-
-      <FocusTimer />
-
-      <CreateTaskForm onCreated={handleCreated} />
+    <div className="trusted-people-page tasks-page">
+      <header className="tasks-page__header">
+        <h1>Missões</h1>
+        {tasks !== null && totalToday > 0 && (
+          <div className="day-progress" aria-label={`${doneToday} de ${totalToday} feitas hoje`}>
+            <div className="day-progress__track">
+              <div className="day-progress__fill" style={{ width: `${(doneToday / totalToday) * 100}%` }} />
+            </div>
+            <span>
+              <strong>{doneToday}</strong> de {totalToday} feitas hoje
+            </span>
+          </div>
+        )}
+      </header>
 
       {error && (
         <p className="form-error" role="alert">
@@ -326,20 +203,62 @@ export function TasksPage() {
         </p>
       )}
       {tasks === null && !error && <p className="checkin-hint">carregando…</p>}
-      {tasks !== null && tasks.length === 0 && <p className="checkin-hint">nenhuma tarefa ainda.</p>}
-      {tasks !== null && tasks.length > 0 && (
-        <ul className="relationship-list">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              relationshipLabel={task.source_relationship_id ? relationshipLabels[task.source_relationship_id] ?? null : null}
-              onChanged={handleChanged}
-            />
-          ))}
-        </ul>
+
+      {isEmpty && (
+        <p className="empty-hint">
+          Lista vazia. Não precisa pensar em nada — escolhe um cartão aí embaixo, ou um pacote pronto.
+        </p>
+      )}
+      {isEmpty && quickAdd}
+
+      {groups.now.length > 0 && (
+        <section className="task-group">
+          <h2 className="task-group__title">Fazendo agora</h2>
+          {renderList(groups.now)}
+        </section>
+      )}
+
+      {groups.queue.length > 0 && (
+        <section className="task-group">
+          <h2 className="task-group__title">
+            Na fila <span className="task-group__count">{groups.queue.length}</span>
+          </h2>
+          {groups.queue.length > 5 && (
+            <p className="checkin-hint">Muita coisa? Olha só a primeira. O resto espera.</p>
+          )}
+          {renderList(groups.queue, true)}
+        </section>
+      )}
+
+      {!isEmpty && tasks !== null && quickAdd}
+
+      <details className="home-more">
+        <summary>Escrever a minha</summary>
+        <div className="home-more__content">
+          <CreateTaskForm onCreated={handleCreated} />
+        </div>
+      </details>
+
+      <details className="home-more">
+        <summary>Timer visual</summary>
+        <div className="home-more__content">
+          <FocusTimer />
+        </div>
+      </details>
+
+      {groups.doneToday.length > 0 && (
+        <section className="task-group task-group--done">
+          <h2 className="task-group__title">Feitas hoje ✓</h2>
+          {renderList(groups.doneToday)}
+        </section>
+      )}
+
+      {groups.archive.length > 0 && (
+        <details className="home-more">
+          <summary>Antigas e canceladas ({groups.archive.length})</summary>
+          <div className="home-more__content">{renderList(groups.archive)}</div>
+        </details>
       )}
     </div>
   );
 }
-

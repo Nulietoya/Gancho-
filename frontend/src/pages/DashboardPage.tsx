@@ -15,7 +15,10 @@ import type {
 import { DateTimeWidget } from "../components/DateTimeWidget";
 import { MedicationDoseRow } from "../components/MedicationDoseRow";
 import { StateBadge } from "../components/StateBadge";
-import { TaskCard } from "./TasksPage";
+import { TaskCard } from "../components/TaskCard";
+import { compareActionable } from "../taskOrdering";
+import { SuggestNow } from "../components/SuggestNow";
+import { energyFromFunctioning } from "../taskTemplates";
 import { TASK_FAILURE_REASON_LABELS, TASK_FAILURE_REASON_ORDER } from "../labels";
 
 /**
@@ -46,18 +49,7 @@ const FUNCTIONING_OPTIONS: { value: number; label: string }[] = [
 function pickNextTask(tasks: TaskPublic[]): TaskPublic | null {
   const actionable = tasks.filter((t) => t.status !== "completed" && t.status !== "cancelled");
   if (actionable.length === 0) return null;
-  const statusWeight: Record<string, number> = { started: 0, paused: 1, pending: 2, postponed: 3 };
-  const priorityWeight: Record<string, number> = { high: 0, medium: 1, low: 2 };
-  return [...actionable].sort((a, b) => {
-    const byStatus = (statusWeight[a.status] ?? 9) - (statusWeight[b.status] ?? 9);
-    if (byStatus !== 0) return byStatus;
-    const byPriority = priorityWeight[a.priority] - priorityWeight[b.priority];
-    if (byPriority !== 0) return byPriority;
-    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
-    if (a.due_date) return -1;
-    if (b.due_date) return 1;
-    return a.created_at.localeCompare(b.created_at);
-  })[0];
+  return [...actionable].sort(compareActionable)[0];
 }
 
 export function DashboardPage() {
@@ -138,6 +130,10 @@ export function DashboardPage() {
     setTasks((prev) => (prev ?? []).map((t) => (t.id === updated.id ? updated : t)));
   }
 
+  function handleTaskCreated(task: TaskPublic) {
+    setTasks((prev) => [task, ...(prev ?? [])]);
+  }
+
   const nextTask = tasks ? pickNextTask(tasks) : null;
 
   async function handleProcrastinatingChip(reason: TaskFailureReasonType) {
@@ -202,13 +198,22 @@ export function DashboardPage() {
 
       {/* Próxima missão */}
       <section className="home-section">
-        <h2>Próxima missão</h2>
+        <div className="home-section__head">
+          <h2>Próxima missão</h2>
+          <Link className="home-section__link" to="/tarefas">
+            + adicionar sem escrever
+          </Link>
+        </div>
         {nextTask ? (
           <ul className="relationship-list">
-            <TaskCard task={nextTask} relationshipLabel={null} onChanged={handleTaskChanged} />
+            <TaskCard key={nextTask.id} task={nextTask} relationshipLabel={null} onChanged={handleTaskChanged} highlight />
           </ul>
         ) : (
-          <p className="checkin-hint">nenhuma missão pendente agora. <Link to="/tarefas">criar uma</Link></p>
+          <SuggestNow
+            tasks={tasks}
+            energy={energyFromFunctioning(data.checkin?.sense_of_functioning)}
+            onCreated={handleTaskCreated}
+          />
         )}
       </section>
 
@@ -242,7 +247,7 @@ export function DashboardPage() {
       <section className="card home-section home-stats">
         <p>Check-in feito {checkinDaysThisWeek} de 7 dias esta semana.</p>
         <p>
-          {pendingTasksCount} missõe{pendingTasksCount === 1 ? "" : "s"} pendente{pendingTasksCount === 1 ? "" : "s"}
+          {pendingTasksCount} {pendingTasksCount === 1 ? "missão pendente" : "missões pendentes"}
           {" · "}
           {completedTasksCount} concluída{completedTasksCount === 1 ? "" : "s"}
         </p>

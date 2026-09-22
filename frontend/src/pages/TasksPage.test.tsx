@@ -97,13 +97,34 @@ describe("TaskCard — botões de ação visíveis por status", () => {
   });
 });
 
-it("mantém o formulário de adiamento quando a API falha", async () => {
+it("mantém os chips de adiamento quando a API falha", async () => {
   vi.mocked(postponeTask).mockRejectedValueOnce(new Error("falha"));
   render(<TaskCard task={makeTask("pending")} relationshipLabel={null} onChanged={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: "Adiar" }));
-  fireEvent.click(screen.getByRole("button", { name: "Confirmar adiamento" }));
-  await waitFor(() => expect(screen.getByRole("button", { name: "Confirmar adiamento" })).toBeEnabled());
-  expect(screen.getByText("Por que adiar")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Esqueci" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Esqueci" })).toBeEnabled());
+  expect(screen.getByRole("group", { name: "Por que adiar" })).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent(/não foi possível atualizar a tarefa/i);
 });
 
+it("adiar é um toque só: o chip do motivo já envia", async () => {
+  const onChanged = vi.fn();
+  vi.mocked(postponeTask).mockResolvedValueOnce({ ...makeTask("postponed"), postponed_count: 1 });
+  render(<TaskCard task={makeTask("pending")} relationshipLabel={null} onChanged={onChanged} />);
+  fireEvent.click(screen.getByRole("button", { name: "Adiar" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tarefa grande demais" }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  expect(postponeTask).toHaveBeenCalledWith("t1", { reason: "tarefa_grande_demais", custom_text: null });
+});
+
+it("mostra o primeiro passo e o tempo estimado em destaque", () => {
+  render(
+    <TaskCard
+      task={{ ...makeTask("pending"), description: "Só abrir o app do banco.", estimated_minutes: 10, category: "chatas" }}
+      relationshipLabel={null}
+      onChanged={vi.fn()}
+    />,
+  );
+  expect(screen.getByText("Só abrir o app do banco.")).toBeInTheDocument();
+  expect(screen.getByText(/~10 min/)).toBeInTheDocument();
+});

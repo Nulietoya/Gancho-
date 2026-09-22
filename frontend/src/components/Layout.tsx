@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
+import { CelebrationToast } from "./CelebrationToast";
 import { OfflineBanner } from "./OfflineBanner";
 
 /**
@@ -66,6 +67,7 @@ export function Layout() {
       <main className="app-main">
         <Outlet />
       </main>
+      <CelebrationToast />
     </div>
   );
 }

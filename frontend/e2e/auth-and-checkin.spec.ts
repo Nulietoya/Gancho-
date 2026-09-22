@@ -28,7 +28,7 @@ test.describe("autenticação e check-in", () => {
     await registerAccount(page, email);
 
     await openMoreMenu(page);
-    await page.getByRole("link", { name: "Check-in" }).click();
+    await page.getByRole("link", { name: "Check-in", exact: true }).click();
     await expect(page).toHaveURL(/\/checkin$/);
 
     // preenche só "Humor" com nota 4 — o formulário aceita qualquer
@@ -48,7 +48,7 @@ test.describe("autenticação e check-in", () => {
     await registerAccount(page, email);
 
     await openMoreMenu(page);
-    await page.getByRole("link", { name: "Check-in" }).click();
+    await page.getByRole("link", { name: "Check-in", exact: true }).click();
     await page.getByRole("button", { name: "Salvar check-in" }).click();
 
     await expect(page.getByText("preencha pelo menos um indicador")).toBeVisible();

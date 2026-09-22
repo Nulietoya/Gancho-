@@ -13,6 +13,7 @@ test.describe("tarefas — ciclo de vida", () => {
     await page.getByRole("link", { name: "Missões" }).click();
     await expect(page).toHaveURL(/\/tarefas$/);
 
+    await page.getByText("Escrever a minha").click();
     await page.getByLabel("Título").fill("Lavar louça");
     await page.getByRole("button", { name: "Criar tarefa" }).click();
 
@@ -31,7 +32,7 @@ test.describe("tarefas — ciclo de vida", () => {
     await expect(badge).toHaveText("Em andamento");
 
     await card.getByRole("button", { name: "Adiar" }).click();
-    await card.getByRole("button", { name: "Confirmar adiamento" }).click();
+    await card.getByRole("button", { name: "Me distraí" }).click();
     await expect(badge).toHaveText("Adiada");
     await expect(card.getByText("adiada 1x")).toBeVisible();
 
@@ -46,6 +47,7 @@ test.describe("tarefas — ciclo de vida", () => {
     await registerAccount(page, uniqueEmail("e2e_tasks_cancel"));
     await page.getByRole("link", { name: "Missões" }).click();
 
+    await page.getByText("Escrever a minha").click();
     await page.getByLabel("Título").fill("Tarefa a cancelar");
     await page.getByRole("button", { name: "Criar tarefa" }).click();
 
@@ -59,5 +61,19 @@ test.describe("tarefas — ciclo de vida", () => {
 
     await card.getByRole("button", { name: "Sim, cancelar" }).click();
     await expect(badge).toHaveText("Cancelada");
+  });
+
+  test("adicionar sem escrever: um toque no cartão pronto vira missão com primeiro passo", async ({ page }) => {
+    await registerAccount(page, uniqueEmail("e2e_tasks_quick"));
+    await page.getByRole("link", { name: "Missões" }).click();
+
+    await page.getByRole("tab", { name: /Corpo/ }).click();
+    await page.getByRole("button", { name: /Beber um copo d'água/ }).click();
+    await page.getByRole("button", { name: "OK" }).click();
+
+    const card = page.locator(".relationship-card", { hasText: "Beber um copo d'água" });
+    await expect(card).toBeVisible();
+    await expect(card.getByText("Pega o copo mais perto de você.")).toBeVisible();
+    await expect(card.getByText("~2 min")).toBeVisible();
   });
 });
